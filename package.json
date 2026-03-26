@@ -1,0 +1,10 @@
+{
+  "name": "freetouse-integrations",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Integrations, plugins, and extensions built on the Free To Use public API",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
