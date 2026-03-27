@@ -1,0 +1,165 @@
+/* ---------------------------------------------------------------------------
+ * Free To Use – Base Styles
+ * Import this in every app for consistent look-and-feel.
+ * Expects variables.css to be imported first (or bundled alongside).
+ * ------------------------------------------------------------------------- */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--ftu-font-family);
+  color: var(--ftu-secondary);
+  background: var(--ftu-white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* -- Links ---------------------------------------------------------------- */
+
+a, a:hover {
+  color: inherit;
+  text-decoration: underline;
+}
+
+a.link-text,
+a.link-text:visited {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* -- Buttons -------------------------------------------------------------- */
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ftu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: var(--ftu-radius-pill);
+  padding: 0.5rem 1.25rem;
+  font-weight: var(--ftu-font-weight-medium);
+  font-size: inherit;
+  transition: background-color var(--ftu-transition-speed), color var(--ftu-transition-speed);
+  cursor: pointer;
+}
+
+.ftu-btn-primary {
+  background: var(--ftu-primary);
+  color: var(--ftu-white);
+}
+
+.ftu-btn-primary:hover {
+  background: var(--ftu-primary-hover);
+}
+
+.ftu-btn-success {
+  background: var(--ftu-green);
+  color: var(--ftu-white);
+}
+
+.ftu-btn-success:hover {
+  background: var(--ftu-green-hover);
+}
+
+.ftu-btn-lighter {
+  background: var(--ftu-lighter);
+  color: var(--ftu-grey);
+}
+
+.ftu-btn-lighter:hover {
+  background: rgba(var(--ftu-light-grey-rgb), 0.45);
+  color: var(--ftu-grey-hover);
+}
+
+/* -- Inputs --------------------------------------------------------------- */
+
+.ftu-input {
+  border: 1px solid var(--ftu-light-grey);
+  border-radius: var(--ftu-radius-pill);
+  padding: 0.5rem 1rem;
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+  transition: border-color var(--ftu-transition-speed);
+}
+
+.ftu-input:focus {
+  border-color: var(--ftu-primary-light);
+}
+
+.ftu-input::placeholder {
+  opacity: 0.5;
+  font-weight: var(--ftu-font-weight-lighter);
+}
+
+/* -- Tags ----------------------------------------------------------------- */
+
+.ftu-tag {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: var(--ftu-lighter);
+  color: var(--ftu-grey);
+  border-radius: var(--ftu-radius-pill);
+  font-size: 65%;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--ftu-transition-speed);
+}
+
+.ftu-tag:hover {
+  background: rgba(var(--ftu-light-grey-rgb), 0.45);
+}
+
+/* -- Utility -------------------------------------------------------------- */
+
+.ftu-text-grey { color: var(--ftu-grey); }
+.ftu-text-primary { color: var(--ftu-primary); }
+.ftu-bg-lighter { background-color: var(--ftu-lighter); }
+.ftu-bg-light { background-color: var(--ftu-light); }
+.ftu-clickable { cursor: pointer; }
+
+/* -- Scrollbar hide ------------------------------------------------------- */
+
+.ftu-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ftu-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* -- Loading pulse animation ---------------------------------------------- */
+
+@keyframes ftu-brightness-pulse {
+  from { filter: brightness(0.975); }
+  to { filter: brightness(1); }
+}
+
+.ftu-loading {
+  animation: ftu-brightness-pulse 750ms alternate infinite;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* -- Fade in -------------------------------------------------------------- */
+
+@keyframes ftu-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ftu-fade-in {
+  opacity: 0;
+  animation: ftu-fade-in linear 250ms forwards;
+}

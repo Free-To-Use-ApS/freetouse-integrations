@@ -1,0 +1,51 @@
+/* ---------------------------------------------------------------------------
+ * Free To Use – Waveform Component
+ * A row of vertical bars representing audio loudness over time.
+ * ------------------------------------------------------------------------- */
+
+.ftu-wave {
+  --wave-border-radius: 0;
+  --wave-bg-base: var(--ftu-light-grey);
+  --wave-bg-played: var(--ftu-primary);
+  --wave-transition-duration: 450ms;
+
+  height: 3rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  column-gap: 1px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ftu-wave.symmetric {
+  align-items: center;
+}
+
+/* Individual bar ---------------------------------------------------------- */
+
+.ftu-wave-bar {
+  display: block;
+  width: 100%;
+  min-height: 1px;
+  background: var(--wave-bg-base);
+  border-radius: var(--wave-border-radius);
+  transition: background-color var(--wave-transition-duration) ease;
+}
+
+/* Played portion ---------------------------------------------------------- */
+
+.ftu-wave-bar[data-played="true"] {
+  background-color: var(--wave-bg-played);
+}
+
+/* Hover preview (pointer devices only) ------------------------------------ */
+
+@media (pointer: fine) {
+  .ftu-wave-bar:hover:not([data-played="true"]),
+  .ftu-wave-bar:has(~ .ftu-wave-bar:hover ~ .ftu-wave-bar[data-played="true"]),
+  .ftu-wave-bar:has(~ .ftu-wave-bar:hover):not(:has(~ .ftu-wave-bar[data-played="true"])) {
+    background: var(--wave-bg-played) !important;
+    transition: none !important;
+  }
+}

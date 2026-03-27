@@ -1,0 +1,37 @@
+/* ---------------------------------------------------------------------------
+ * Free To Use – Pill Toggle / Selector Component
+ * A row of pill-shaped buttons where one is active.
+ * ------------------------------------------------------------------------- */
+
+.ftu-pill-toggle {
+  display: inline-flex;
+  background-color: #e9ecef;
+  border-radius: var(--ftu-radius-pill);
+  padding: 4px;
+}
+
+.ftu-pill-toggle button {
+  flex: 1;
+  padding: 0.25rem 1.5rem;
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  font-family: inherit;
+  font-weight: var(--ftu-font-weight-medium);
+  border-radius: var(--ftu-radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 300ms ease-in-out,
+    background-color 300ms ease-in-out;
+}
+
+.ftu-pill-toggle button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.ftu-pill-toggle button.active {
+  color: #343a40;
+  background-color: var(--ftu-white);
+}

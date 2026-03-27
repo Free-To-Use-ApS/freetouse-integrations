@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Royalty Free Music for Creators | Free To Use",
+  "version": "1.0.0",
+  "description": "Royalty-free background music for creators – completely free, sign-up not even required. Just unlimited free downloads of safe, high-quality music with no copyright issues.",
+  "permissions": ["offscreen", "downloads", "downloads.shelf", "storage"],
+  "host_permissions": ["https://*.freetouse.com/*"],
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

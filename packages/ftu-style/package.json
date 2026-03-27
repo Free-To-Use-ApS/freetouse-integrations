@@ -1,0 +1,13 @@
+{
+  "name": "@freetouse/style",
+  "version": "0.1.0",
+  "description": "Shared design tokens and base styles matching freetouse.com",
+  "type": "module",
+  "exports": {
+    "./variables.css": "./src/variables.css",
+    "./base.css": "./src/base.css",
+    "./components/player.css": "./src/components/player.css",
+    "./components/waveform.css": "./src/components/waveform.css",
+    "./components/pills.css": "./src/components/pills.css"
+  }
+}

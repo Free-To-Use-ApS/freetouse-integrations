@@ -1,0 +1,59 @@
+/* ---------------------------------------------------------------------------
+ * Free To Use – Design Tokens
+ * Extracted from freetouse.com. Use these variables in all apps/extensions.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  /* -- Colors -------------------------------------------------------------- */
+  --ftu-primary: #7569de;
+  --ftu-primary-rgb: 117, 105, 222;
+  --ftu-primary-hover: #635ecc;
+  --ftu-primary-hover-rgb: 99, 94, 204;
+  --ftu-primary-light: #978ee6;
+  --ftu-primary-light-rgb: 151, 142, 230;
+
+  --ftu-black: #000000;
+  --ftu-black-rgb: 0, 0, 0;
+  --ftu-secondary: #383838;
+  --ftu-secondary-rgb: 56, 56, 56;
+
+  --ftu-grey: #969696;
+  --ftu-grey-rgb: 150, 150, 150;
+  --ftu-grey-hover: #7f7f7f;
+  --ftu-grey-hover-rgb: 127, 127, 127;
+  --ftu-light-grey: #d1d1d1;
+  --ftu-light-grey-rgb: 209, 209, 209;
+
+  --ftu-light: #f2f2f2;
+  --ftu-light-rgb: 242, 242, 242;
+  --ftu-lighter: #f7f7f7;
+  --ftu-lighter-rgb: 247, 247, 247;
+  --ftu-white: #ffffff;
+
+  --ftu-green: #79c67d;
+  --ftu-green-rgb: 121, 198, 125;
+  --ftu-green-hover: #54af56;
+  --ftu-green-hover-rgb: 84, 175, 86;
+
+  /* -- Typography ---------------------------------------------------------- */
+  --ftu-font-family: 'Nunito', 'Montserrat', system-ui, -apple-system, sans-serif;
+  --ftu-font-weight-lighter: 300;
+  --ftu-font-weight-normal: 400;
+  --ftu-font-weight-medium: 500;
+  --ftu-font-weight-bold: 700;
+  --ftu-font-weight-bolder: 800;
+  --ftu-font-weight-title: 750;
+
+  /* -- Border Radius ------------------------------------------------------- */
+  --ftu-radius-pill: 5rem;
+  --ftu-radius-card: 1rem;
+  --ftu-radius-modal: 1.375rem;
+  --ftu-radius-sm: 0.75rem;
+
+  /* -- Transitions --------------------------------------------------------- */
+  --ftu-transition-speed: 250ms;
+
+  /* -- Shadows ------------------------------------------------------------- */
+  --ftu-shadow-header: 0 2px 5px 0 rgba(0, 0, 0, 0.075);
+  --ftu-shadow-notification: 0 0 2rem rgba(0, 0, 0, 0.15);
+}

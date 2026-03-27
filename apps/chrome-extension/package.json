@@ -1,0 +1,26 @@
+{
+  "name": "ftu-chrome-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build && vite build --config vite.config.sw.ts",
+    "build:popup": "vite build",
+    "build:sw": "vite build --config vite.config.sw.ts"
+  },
+  "dependencies": {
+    "@freetouse/api": "*",
+    "@freetouse/style": "*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}
