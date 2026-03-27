@@ -47,10 +47,8 @@ export function App() {
   const contentRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE_BACK = 20;
 
-  const [initialLimit, setInitialLimit] = useState(0);
-
   const { tracks, categories, loading, hasMore, loadMore, saveSnapshot, restoreSnapshot, setNextFetchLimit } =
-    useTracks(query, categoryId, relatedToId, restored, initialLimit);
+    useTracks(query, categoryId, relatedToId, restored);
 
   // Restore persisted state on mount
   useEffect(() => {
@@ -71,7 +69,7 @@ export function App() {
         setCategoryId(saved.categoryId);
       }
       if (saved?.trackCount && saved.trackCount > 20) {
-        setInitialLimit(saved.trackCount);
+        setNextFetchLimit(saved.trackCount);
       }
       // Cache the scroll position so it survives later writes to storage
       pendingScrollRef.current = saved?.scrollTop ?? 0;
@@ -109,7 +107,13 @@ export function App() {
     });
   }, [loading, tracks.length]);
 
-  // Persist scroll position and track count on scroll (debounced)
+  // Persist track count whenever it changes (e.g. after "Load more")
+  useEffect(() => {
+    if (!restored || tracks.length === 0) return;
+    persistView({ trackCount: tracks.length });
+  }, [restored, tracks.length]);
+
+  // Persist scroll position on scroll (debounced)
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
@@ -117,7 +121,7 @@ export function App() {
     const onScroll = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        persistView({ scrollTop: el.scrollTop, trackCount: tracks.length });
+        persistView({ scrollTop: el.scrollTop });
       }, 200);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -125,7 +129,7 @@ export function App() {
       clearTimeout(timer);
       el.removeEventListener("scroll", onScroll);
     };
-  }, [categoryId, tracks.length]);
+  }, [categoryId]);
 
   const handleSearch = useCallback((q: string) => {
     setQuery(q);

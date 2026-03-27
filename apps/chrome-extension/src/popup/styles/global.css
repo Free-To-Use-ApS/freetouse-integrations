@@ -620,13 +620,13 @@ html, body {
 }
 
 .skeleton-title {
-  width: 65%;
+  width: 45%;
   height: 0.75rem;
   margin-bottom: 0.125rem;
 }
 
 .skeleton-artist {
-  width: 40%;
+  width: 28%;
   height: 0.625rem;
 }
 

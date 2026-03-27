@@ -94,10 +94,11 @@ export function useTracks(
     const limit = nextFetchLimitRef.current > PAGE_SIZE
       ? nextFetchLimitRef.current
       : PAGE_SIZE;
-    nextFetchLimitRef.current = 0;
 
     fetchTracks(query, categoryId, relatedToId, 0, limit).then((res) => {
       if (controller.signal.aborted) return;
+      // Only clear the override after a successful non-aborted fetch
+      nextFetchLimitRef.current = 0;
       setTracks(res.data);
       offsetRef.current = res.data.length;
       setHasMore(res.data.length >= limit);
@@ -108,12 +109,12 @@ export function useTracks(
   }, [query, categoryId, relatedToId, ready]);
 
   const loadMore = useCallback(() => {
-    const nextOffset = offsetRef.current + PAGE_SIZE;
-    offsetRef.current = nextOffset;
+    const offset = offsetRef.current;
     setLoading(true);
 
-    fetchTracks(query, categoryId, relatedToId, nextOffset).then((res) => {
+    fetchTracks(query, categoryId, relatedToId, offset).then((res) => {
       setTracks((prev) => [...prev, ...res.data]);
+      offsetRef.current = offset + res.data.length;
       setHasMore(res.data.length >= PAGE_SIZE);
       setLoading(false);
     });
