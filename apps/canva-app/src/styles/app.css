@@ -1,0 +1,16 @@
+.ftu-category-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.ftu-category-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.ftu-category-bar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
