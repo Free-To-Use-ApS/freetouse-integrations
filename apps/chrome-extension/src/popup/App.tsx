@@ -145,21 +145,35 @@ export function App() {
   }, []);
 
   const handleFindSimilar = useCallback((trackId: string) => {
-    const scrollTop = contentRef.current?.scrollTop ?? 0;
-    savedViewRef.current = { query, categoryId, scrollTop, snapshot: saveSnapshot() };
+    if (relatedToId === null) {
+      // Coming from a non-related view (category, search, or All).
+      // Capture it as the destination for the Back button.
+      const scrollTop = contentRef.current?.scrollTop ?? 0;
+      savedViewRef.current = { query, categoryId, scrollTop, snapshot: saveSnapshot() };
+      persistView({
+        relatedToId: trackId,
+        categoryId: null,
+        scrollTop: 0,
+        trackCount: 0,
+        previousCategoryId: categoryId,
+        previousScrollTop: scrollTop,
+        previousTrackCount: tracks.length,
+      });
+    } else {
+      // Already inside a related view — swap to the new related id without
+      // overwriting the saved "back to" view, so Back still returns to the
+      // original category / search the user started from.
+      persistView({
+        relatedToId: trackId,
+        categoryId: null,
+        scrollTop: 0,
+        trackCount: 0,
+      });
+    }
     setRelatedToId(trackId);
     setQuery("");
     setCategoryId(null);
-    persistView({
-      relatedToId: trackId,
-      categoryId: null,
-      scrollTop: 0,
-      trackCount: 0,
-      previousCategoryId: categoryId,
-      previousScrollTop: scrollTop,
-      previousTrackCount: tracks.length,
-    });
-  }, [query, categoryId, saveSnapshot, tracks.length]);
+  }, [query, categoryId, relatedToId, saveSnapshot, tracks.length]);
 
   const handleBack = useCallback(() => {
     const saved = savedViewRef.current;

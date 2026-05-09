@@ -12,7 +12,16 @@ import type {
   TrackSearchParams,
 } from "./types.js";
 
-const BASE_URL = "https://api.freetouse.com/v3";
+const DEFAULT_BASE_URL = "https://api.freetouse.com/v3";
+let baseUrl = DEFAULT_BASE_URL;
+
+export function setBaseUrl(url: string) {
+  baseUrl = url.replace(/\/+$/, "");
+}
+
+export function getBaseUrl() {
+  return baseUrl;
+}
 
 function qs(params: Record<string, unknown>): string {
   const entries = Object.entries(params as Record<string, unknown>).filter(([, v]) => v !== undefined);
@@ -21,7 +30,7 @@ function qs(params: Record<string, unknown>): string {
 }
 
 async function request<T>(path: string, params: object = {}): Promise<T> {
-  const url = `${BASE_URL}${path}${qs(params as Record<string, unknown>)}`;
+  const url = `${baseUrl}${path}${qs(params as Record<string, unknown>)}`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`FTU API error: ${res.status} ${res.statusText}`);

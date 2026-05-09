@@ -8,6 +8,7 @@
     "./base.css": "./src/base.css",
     "./components/player.css": "./src/components/player.css",
     "./components/waveform.css": "./src/components/waveform.css",
-    "./components/pills.css": "./src/components/pills.css"
+    "./components/pills.css": "./src/components/pills.css",
+    "./logo.svg": "./logo.svg"
   }
 }

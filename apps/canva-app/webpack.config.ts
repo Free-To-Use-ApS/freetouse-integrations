@@ -5,15 +5,20 @@ import webpack from "webpack";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const config: webpack.Configuration = {
-  entry: "./src/index.tsx",
+  mode: "development",
+  devtool: "source-map",
+  context: path.resolve(__dirname, "./"),
+  entry: {
+    app: path.join(__dirname, "src", "index.tsx"),
+  },
+  target: "web",
   output: {
-    filename: "bundle.js",
+    filename: "[name].js",
     path: path.resolve(__dirname, "dist"),
     clean: true,
-    publicPath: "/",
   },
   resolve: {
-    extensions: [".tsx", ".ts", ".js", ".jsx"],
+    extensions: [".tsx", ".ts", ".js", ".css"],
     symlinks: true,
   },
   module: {
@@ -45,20 +50,17 @@ const config: webpack.Configuration = {
   devServer: {
     port: 8080,
     server: "https",
-    setupMiddlewares: (middlewares: any[], devServer: any) => {
-      // Rewrite root to serve bundle.js — Canva loads the JS bundle from the root URL
-      devServer.app.get("/", (_req: any, _res: any, next: any) => {
-        _req.url = "/bundle.js";
-        next();
-      });
-      return middlewares;
+    host: "localhost",
+    allowedHosts: ["localhost"],
+    historyApiFallback: {
+      rewrites: [{ from: /^\/$/, to: "/app.js" }],
     },
     headers: {
       "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Credentials": "true",
       "Access-Control-Allow-Private-Network": "true",
     },
-    hot: false,
-    allowedHosts: "all",
+    webSocketServer: false,
   },
 };
 

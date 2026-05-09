@@ -10,19 +10,20 @@
   "dependencies": {
     "@canva/app-hooks": "0.0.0-beta.4",
     "@canva/app-i18n-kit": "^1.2.0",
-    "@canva/app-ui-kit": "^4.10.0",
+    "@canva/app-ui-kit": "^5.8.0",
     "@canva/asset": "^2.3.0",
     "@canva/design": "^2.8.0",
-    "@canva/intents": "^2.4.0",
+    "@canva/intents": "^2.5.0",
     "@canva/platform": "^2.2.2",
     "@freetouse/api": "*",
-    "mobx": "^6.13.3",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "@freetouse/style": "*",
+    "mobx": "^6.15.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "css-loader": "^7.0.0",
     "cssnano": "^7.0.0",
     "postcss-loader": "^8.0.0",

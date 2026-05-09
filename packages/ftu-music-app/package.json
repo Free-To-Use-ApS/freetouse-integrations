@@ -1,0 +1,7 @@
+{
+  "name": "@freetouse/music-app",
+  "version": "0.1.0",
+  "description": "Boilerplate, playbook, and shared learnings for building Free To Use music apps. Read PLAYBOOK.md before starting a new app.",
+  "private": true,
+  "type": "module"
+}

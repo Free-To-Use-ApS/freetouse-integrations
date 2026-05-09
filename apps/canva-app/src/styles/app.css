@@ -1,16 +1,845 @@
-.ftu-category-bar {
+/* ---------------------------------------------------------------------------
+ * Free To Use – Canva App
+ * Mirrors the Chrome extension layout: search + categories on top, scrollable
+ * track list, fixed player bar with waveform at the bottom.
+ * ------------------------------------------------------------------------- */
+
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;700;800&display=swap");
+@import "@freetouse/style/variables.css";
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Canva's UI Kit stylesheet sets `html { font-size: 62.5% }` (=10px) as a
+ * reset, which made all our rem-based sizes render at ~62% of their intended
+ * value. Override with !important to restore a normal scale. */
+html {
+  font-size: 16px !important;
+}
+
+body {
+  font-family: var(--ftu-font-family);
+  color: var(--ftu-secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  background: var(--ftu-white);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------
+ * App layout
+ * ------------------------------------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ftu-white);
+  /* Single source of truth for left/right alignment of all content
+   * (search bar, category pills, track items). Tweak this one value to
+   * shift the entire content column left or right. */
+  --content-x: 0.75rem;
+  /* Track items have their own 0.375rem internal padding, so we subtract
+   * that from .app-content's padding to keep covers aligned with the
+   * search bar and pills above. */
+  --content-x-track: calc(var(--content-x) - 0.375rem);
+}
+
+.app-header {
+  flex-shrink: 0;
+  position: relative;
+  padding: 0.5rem var(--content-x) 0.875rem 0;
+  background: transparent;
+  z-index: 10;
+}
+
+/* Separator line between categories and track list — respects content padding
+ * so it lines up with the search bar / categories instead of touching the
+ * panel's right edge. */
+.app-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: var(--content-x);
+  bottom: 0;
+  border-top: 1px solid var(--ftu-light);
+}
+
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.875rem var(--content-x) 0.5rem 0;
+}
+
+/* (Track item padding lives in the .track-item rule lower down — kept at
+ * 0.375rem all sides so the hover background extends slightly past the cover
+ * for a comfortable hover hit area.) */
+
+.app-player {
+  flex-shrink: 0;
+  border-top: 1px solid var(--ftu-light);
+  background: var(--ftu-white);
+}
+
+/* ---------------------------------------------------------------------------
+ * Search
+ * ------------------------------------------------------------------------- */
+
+.search-container {
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem 2.25rem 0.5rem 1rem;
+  border: 1px solid var(--ftu-light-grey);
+  border-radius: var(--ftu-radius-pill);
+  font-family: inherit;
+  font-size: 0.875rem;
+  outline: none;
+  background: var(--ftu-white);
+  color: var(--ftu-secondary);
+  transition: border-color var(--ftu-transition-speed);
+}
+
+.search-input:focus {
+  border-color: var(--ftu-primary-light);
+}
+
+.search-input::placeholder {
+  opacity: 0.5;
+  font-weight: var(--ftu-font-weight-lighter);
+}
+
+.search-icon {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ftu-grey);
+  pointer-events: none;
+  width: 16px;
+  height: 16px;
+}
+
+.search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--ftu-grey);
+  cursor: pointer;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------------------
+ * Categories
+ * ------------------------------------------------------------------------- */
+
+.categories {
+  display: flex;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
   overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.ftu-category-bar::-webkit-scrollbar {
-  height: 4px;
+.categories::-webkit-scrollbar {
+  display: none;
 }
 
-.ftu-category-bar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 2px;
+.category-pill {
+  flex-shrink: 0;
+  padding: 0.25rem 0.75rem;
+  background: var(--ftu-lighter);
+  color: var(--ftu-grey);
+  border: none;
+  border-radius: var(--ftu-radius-pill);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: var(--ftu-font-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--ftu-transition-speed),
+    color var(--ftu-transition-speed);
+}
+
+.category-pill:hover {
+  background: rgba(var(--ftu-light-grey-rgb), 0.45);
+  color: #5e656b;
+}
+
+.category-pill.active {
+  background: var(--ftu-primary);
+  color: var(--ftu-white);
+}
+
+/* ---------------------------------------------------------------------------
+ * Track list
+ * ------------------------------------------------------------------------- */
+
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.track-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem;
+  border-radius: var(--ftu-radius-card);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--ftu-transition-speed);
+}
+
+.track-item:hover {
+  background: var(--ftu-lighter);
+}
+
+.track-item.active {
+  background: var(--ftu-light);
+}
+
+.track-item:active {
+  cursor: grabbing;
+}
+
+.track-item-cover {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: var(--ftu-radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--ftu-lighter);
+}
+
+.track-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.track-item-title {
+  font-weight: var(--ftu-font-weight-title);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.track-item-artist {
+  font-size: 0.8125rem;
+  color: var(--ftu-grey);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.track-item-tags,
+.track-item-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.track-item-tags {
+  flex-direction: column;
+  align-items: flex-end;
+  transition: opacity var(--ftu-transition-speed);
+}
+
+.track-item-actions {
+  display: none;
+  gap: 0.125rem;
+  margin-right: 0.5rem;
+}
+
+.track-item:hover .track-item-tags {
+  display: none;
+}
+
+.track-item:hover .track-item-actions {
+  display: flex;
+}
+
+.track-item-tag {
+  font-size: 0.625rem;
+  font-weight: var(--ftu-font-weight-medium);
+  color: var(--ftu-grey);
+  background: var(--ftu-lighter);
+  border-radius: var(--ftu-radius-pill);
+  padding: 0.1875rem 0.5rem;
+  white-space: nowrap;
+}
+
+.track-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  background: none;
+  border: none;
+  border-radius: var(--ftu-radius-sm);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    color var(--ftu-transition-speed),
+    background-color var(--ftu-transition-speed);
+}
+
+.track-action-btn--text {
+  position: relative;
+  height: auto;
+  padding: 0 0 2px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: var(--ftu-font-weight-medium);
+  white-space: nowrap;
+  color: var(--ftu-primary);
+  border-radius: 0;
+}
+
+.track-action-btn-content {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: transform 150ms ease;
+}
+
+.track-action-btn--text::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.track-action-btn--text:hover {
+  color: var(--ftu-primary-hover);
+}
+
+.track-action-btn--text:hover .track-action-btn-content {
+  transform: translateY(-2px);
+}
+
+.track-action-btn--text:hover::after {
+  opacity: 1;
+}
+
+.track-action-btn--icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--ftu-grey);
+}
+
+.track-action-btn--icon:hover {
+  color: var(--ftu-primary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Back button (Related Tracks view)
+ * ------------------------------------------------------------------------- */
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: var(--ftu-font-weight-medium);
+  color: var(--ftu-grey);
+  cursor: pointer;
+  padding: 0.375rem 0;
+}
+
+.back-btn:hover {
+  color: var(--ftu-secondary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Bottom player bar
+ * ------------------------------------------------------------------------- */
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Left padding matches the .track-item internal padding (0.375rem) so the
+   * player cover lines up with the track covers above. */
+  padding: 0.5rem var(--content-x) 0.5rem 0.375rem;
+  background: var(--ftu-white);
+}
+
+.player-bar-cover-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: var(--ftu-radius-sm);
+  overflow: hidden;
+  display: block;
+  transition: opacity var(--ftu-transition-speed);
+}
+
+.player-bar-cover-btn:hover {
+  opacity: 0.85;
+}
+
+.player-bar-cover {
+  width: 2.875rem;
+  height: 2.875rem;
+  border-radius: var(--ftu-radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--ftu-lighter);
+  display: block;
+}
+
+/* Title and artist links inside the player bar — look like normal text but
+ * navigate to the track / artist page on freetouse.com when clicked.
+ *
+ * Important: do NOT include :hover in this base reset block. Adding :hover
+ * raises specificity above .player-bar-title's font-weight/size rules and
+ * causes the title text to visually change on hover. We only want a slight
+ * color darken — see the rules below. */
+.player-bar-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  outline: 0;
+}
+
+.player-bar-link:focus,
+.player-bar-link:focus-visible,
+.player-bar-link:active {
+  outline: 0;
+  text-decoration: none;
+}
+
+/* The only visual change between states: a slightly darker text color on
+ * hover. Specificity 0,2,1 ensures this wins without affecting any other
+ * property (font, transform, etc. stay exactly as they are). */
+.player-bar-title.player-bar-link:hover {
+  color: var(--ftu-black);
+}
+
+.player-bar-artist .player-bar-link:hover {
+  color: var(--ftu-grey-hover);
+}
+
+/* Title button needs to behave like the original .player-bar-title div for
+ * ellipsis/overflow purposes. */
+button.player-bar-title {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.player-bar-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+}
+
+.player-bar-title {
+  font-weight: var(--ftu-font-weight-title);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.player-bar-artist {
+  font-size: 0.75rem;
+  color: var(--ftu-grey);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.player-bar-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--ftu-grey);
+  cursor: pointer;
+  padding: 0.125rem;
+  transition: color var(--ftu-transition-speed);
+}
+
+.player-bar-btn:hover {
+  color: var(--ftu-primary-hover);
+}
+
+.player-bar-btn.playing {
+  color: var(--ftu-primary);
+}
+
+.player-bar-time {
+  font-size: 0.8125rem;
+  color: var(--ftu-grey);
+  flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Waveform — used inside the bottom player bar
+ * ------------------------------------------------------------------------- */
+
+.ftu-wave {
+  height: 1.75rem;
+  padding: 0 var(--content-x) 0 0.375rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  column-gap: 1px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.ftu-wave-bar {
+  display: block;
+  flex: 1 1 0;
+  min-height: 1px;
+  background: var(--ftu-light-grey);
+  border-radius: 0;
+  transition: background-color 450ms ease;
+}
+
+.ftu-wave-bar[data-played="true"] {
+  background-color: var(--ftu-primary);
+}
+
+/* Hover preview (pointer devices only) — when hovering an unplayed bar,
+ * paint that bar and every unplayed bar before it with the "played" color
+ * so the user previews how much will be played if they click here. Mirrors
+ * the Chrome extension behavior. */
+@media (pointer: fine) {
+  .ftu-wave-bar:hover:not([data-played="true"]),
+  .ftu-wave-bar:has(~ .ftu-wave-bar:hover ~ .ftu-wave-bar[data-played="true"]),
+  .ftu-wave-bar:has(~ .ftu-wave-bar:hover):not(:has(~ .ftu-wave-bar[data-played="true"])) {
+    background: var(--ftu-primary) !important;
+    transition: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Loading / footer / load more
+ * ------------------------------------------------------------------------- */
+
+.loading-text {
+  text-align: center;
+  color: var(--ftu-grey);
+  font-size: 0.8125rem;
+  padding: 2rem 0;
+  margin: 0;
+}
+
+.load-more-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  background: var(--ftu-lighter);
+  color: var(--ftu-grey);
+  border: none;
+  border-radius: var(--ftu-radius-pill);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: var(--ftu-font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--ftu-transition-speed);
+}
+
+.load-more-btn:hover {
+  background: rgba(var(--ftu-light-grey-rgb), 0.45);
+}
+
+.track-list-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  margin-top: 0.625rem;
+  margin-bottom: 0.625rem;
+}
+
+.footer-link {
+  font-size: 0.625rem;
+  font-weight: var(--ftu-font-weight-medium);
+  color: var(--ftu-light-grey);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color var(--ftu-transition-speed);
+}
+
+.footer-link:hover {
+  color: var(--ftu-grey);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footer-divider {
+  font-size: 0.625rem;
+  color: var(--ftu-light-grey);
+  user-select: none;
+}
+
+.player-license {
+  padding: 0.25rem var(--content-x) 0.4rem 0.375rem;
+  font-size: 0.5625rem;
+  color: var(--ftu-grey);
+  line-height: 1.4;
+}
+
+.player-license-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+ * Skeleton loading
+ * ------------------------------------------------------------------------- */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f7f7f7 25%,
+    #f2f2f2 50%,
+    #f7f7f7 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--ftu-radius-sm);
+}
+
+.skeleton-item {
+  pointer-events: none;
+}
+
+.skeleton-cover {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex-shrink: 0;
+  border-radius: var(--ftu-radius-sm);
+}
+
+.skeleton-title {
+  width: 45%;
+  height: 0.9375rem;
+  margin-bottom: 0.25rem;
+}
+
+.skeleton-artist {
+  width: 28%;
+  height: 0.8125rem;
+}
+
+.skeleton-tags {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.skeleton-tag {
+  width: 2.75rem;
+  height: 1rem;
+  border-radius: var(--ftu-radius-pill);
+}
+
+.skeleton-tag--short {
+  width: 2.125rem;
+}
+
+/* Skeleton category pills — inherits .category-pill's padding and
+ * border-radius for an identical shape, plus .skeleton's shimmer animation.
+ * The non-breaking space content (in the JSX) gives it natural row height. */
+.skeleton-pill {
+  color: transparent;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Attribution modal — shown after a track is added to the design, to remind
+ * the user to credit the track in their content.
+ * ------------------------------------------------------------------------- */
+.attribution-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1.25rem;
+}
+
+.attribution-modal {
+  background: var(--ftu-white);
+  border-radius: var(--ftu-radius-modal);
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  box-shadow: var(--ftu-shadow-notification);
+}
+
+.attribution-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.attribution-title {
+  font-size: 1.125rem;
+  font-weight: var(--ftu-font-weight-bolder);
+  line-height: 1.2;
+  color: var(--ftu-secondary);
+}
+
+.attribution-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ftu-grey);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 0.125rem;
+  transition: color var(--ftu-transition-speed);
+}
+
+.attribution-close:hover {
+  color: var(--ftu-secondary);
+}
+
+.attribution-description {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ftu-secondary);
+}
+
+.attribution-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--ftu-lighter);
+  border: 1px solid var(--ftu-light-grey);
+  border-radius: var(--ftu-radius-sm);
+}
+
+.attribution-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.attribution-line {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ftu-secondary);
+  word-break: break-all;
+}
+
+.attribution-copy-icon {
+  flex-shrink: 0;
+  align-self: flex-end;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ftu-grey);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color var(--ftu-transition-speed);
+}
+
+.attribution-copy-icon:hover {
+  color: var(--ftu-primary);
+}
+
+.attribution-copy-icon.copied {
+  color: var(--ftu-green);
 }

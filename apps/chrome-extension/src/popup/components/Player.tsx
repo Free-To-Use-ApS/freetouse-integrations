@@ -23,6 +23,16 @@ function getLicenseUrl(track: Track): string {
   return `https://freetouse.com/music/${artist}/${title}/license`;
 }
 
+function getTrackUrl(track: Track): string {
+  const artist = slugify(track.artists[0]?.[1]?.name ?? "unknown");
+  const title = slugify(track.title);
+  return `https://freetouse.com/music/${artist}/${title}`;
+}
+
+function getArtistUrl(artistName: string): string {
+  return `https://freetouse.com/music/${slugify(artistName)}`;
+}
+
 async function startDownload(track: Track) {
   const artists = getArtistNames(track);
   const filename = `${artists} - ${track.title} (freetouse.com).mp3`;
@@ -60,13 +70,45 @@ export function Player({ onDownload }: PlayerProps) {
   const progress = duration > 0 ? currentTime / duration : 0;
   const artists = getArtistNames(track);
 
+  const trackUrl = getTrackUrl(track);
+
   return (
     <div className="app-player">
       <div className="player-bar">
-        <img className="player-bar-cover" src={track.thumbnails.sm} alt="" />
+        <a
+          className="player-bar-cover-link"
+          href={trackUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open ${track.title} on freetouse.com`}
+        >
+          <img className="player-bar-cover" src={track.thumbnails.sm} alt="" />
+        </a>
         <div className="player-bar-info">
-          <div className="player-bar-title">{track.title}</div>
-          <div className="player-bar-artist">{artists}</div>
+          <a
+            className="player-bar-title player-bar-link"
+            href={trackUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={track.title}
+          >
+            {track.title}
+          </a>
+          <div className="player-bar-artist">
+            {track.artists.map(([, a], idx) => (
+              <span key={a.id ?? a.name}>
+                {idx > 0 && ", "}
+                <a
+                  className="player-bar-link"
+                  href={getArtistUrl(a.name)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {a.name}
+                </a>
+              </span>
+            ))}
+          </div>
         </div>
         <span className="player-bar-time">
           {formatTime(currentTime)} / {formatTime(duration)}

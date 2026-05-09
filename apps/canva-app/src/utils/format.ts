@@ -22,3 +22,13 @@ export function getLicenseUrl(track: Track): string {
   const title = slugify(track.title);
   return `https://freetouse.com/music/${artist}/${title}/license`;
 }
+
+export function getTrackUrl(track: Track): string {
+  const artist = slugify(track.artists[0]?.[1]?.name ?? "unknown");
+  const title = slugify(track.title);
+  return `https://freetouse.com/music/${artist}/${title}`;
+}
+
+export function getArtistUrl(artistName: string): string {
+  return `https://freetouse.com/music/${slugify(artistName)}`;
+}

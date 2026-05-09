@@ -6,13 +6,22 @@ Plugins, extensions, and tools built on the [Free To Use](https://freetouse.com)
 
 ```
 apps/                    # Standalone apps, extensions, and plugins
-  chrome-extension/      # Chrome extension (first project)
+  chrome-extension/      # Browser popup with offscreen audio, downloads, attribution modal
+  canva-app/             # Canva editor side panel with drag-to-design, click-to-add
 packages/                # Shared libraries consumed by apps
   ftu-api/               # TypeScript client for api.freetouse.com/v3
+  ftu-style/             # Design tokens, colors, fonts (FTU brand)
+  ftu-music-app/         # PLAYBOOK + CHEATSHEET — read before building a new music app
 ```
 
 - **apps/** – Each subdirectory is a deployable artifact (browser extension, CLI tool, web app, etc.).
 - **packages/** – Shared code. Apps import these via npm workspace references (e.g. `"@freetouse/api": "*"`).
+
+## Building a new music app
+
+**Before starting any new music app, read `packages/ftu-music-app/PLAYBOOK.md`.** It documents every pattern, bug fix, and gotcha learned from building the Chrome extension and Canva app — including audio playback architecture, autoplay queue, waveform scrubber math, state restoration, attribution modal, find-similar back navigation, and platform-specific quirks. Don't rediscover bugs the playbook already covers.
+
+`packages/ftu-music-app/CHEATSHEET.md` has the same content condensed to a single-page reference plus a "top 10 gotchas" list.
 
 ## Free To Use API
 
