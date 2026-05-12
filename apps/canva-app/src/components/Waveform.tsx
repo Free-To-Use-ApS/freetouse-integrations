@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { useIntl } from "react-intl";
 
 interface WaveformProps {
   /** ~300 integers (0–100) representing loudness over time */
@@ -27,6 +28,7 @@ function downsample(data: number[], bars: number): number[] {
 }
 
 export function Waveform({ data, progress, onSeek }: WaveformProps) {
+  const intl = useIntl();
   const containerRef = useRef<HTMLDivElement>(null);
   const bars = downsample(data, BAR_COUNT);
 
@@ -85,7 +87,11 @@ export function Waveform({ data, progress, onSeek }: WaveformProps) {
       className="ftu-wave"
       onPointerDown={handlePointerDown}
       role="slider"
-      aria-label="Track progress"
+      aria-label={intl.formatMessage({
+        defaultMessage: "Track progress",
+        description:
+          "Accessible label for the waveform scrubber that shows / controls playback position.",
+      })}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(progress * 100)}

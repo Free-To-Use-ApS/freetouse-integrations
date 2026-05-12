@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { FormattedMessage, useIntl } from "react-intl";
 import type { Track, TrackCategory } from "@freetouse/api";
 import { upload } from "@canva/asset";
 import { addAudioTrack, ui } from "@canva/design";
@@ -28,6 +29,7 @@ interface TrackItemProps {
 }
 
 export function TrackItem({ track, queue, onFindSimilar }: TrackItemProps) {
+  const intl = useIntl();
   const isSupported = useFeatureSupport();
   const canAdd = isSupported(addAudioTrack);
   const player = useAudioPlayer();
@@ -87,7 +89,14 @@ export function TrackItem({ track, queue, onFindSimilar }: TrackItemProps) {
       onDragStart={canAdd ? handleDragStart : undefined}
       role="button"
       tabIndex={0}
-      aria-label={`Play preview of ${track.title}`}
+      aria-label={intl.formatMessage(
+        {
+          defaultMessage: "Play preview of {title}",
+          description:
+            "Accessible label for the track row; clicking it plays a preview of the track.",
+        },
+        { title: track.title },
+      )}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -141,15 +150,29 @@ export function TrackItem({ track, queue, onFindSimilar }: TrackItemProps) {
                 d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"
               />
             </svg>
-            Find Similar
+            <FormattedMessage
+              defaultMessage="Find Similar"
+              description="Hover action on a track that opens a list of tracks similar to it."
+            />
           </span>
         </button>
         {canAdd && (
           <button
             type="button"
             className="track-action-btn track-action-btn--icon"
-            title="Add to design"
-            aria-label={`Add ${displayTitle} to design`}
+            title={intl.formatMessage({
+              defaultMessage: "Add",
+              description:
+                "Tooltip on the icon button that adds the track to the user's Canva design.",
+            })}
+            aria-label={intl.formatMessage(
+              {
+                defaultMessage: "Add {title} to design",
+                description:
+                  "Accessible label for the icon button that adds a specific track to the user's design.",
+              },
+              { title: displayTitle },
+            )}
             onClick={(e) => {
               e.stopPropagation();
               handleAddToDesign();

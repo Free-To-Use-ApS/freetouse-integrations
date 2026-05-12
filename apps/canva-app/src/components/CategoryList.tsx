@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { FormattedMessage, useIntl } from "react-intl";
 import type { Category } from "@freetouse/api";
 import {
   loadCategoryScroll,
@@ -36,6 +37,7 @@ export function CategoryList({
   loading,
   onSelect,
 }: CategoryListProps) {
+  const intl = useIntl();
   const scrollRestoredRef = useRef(false);
   const elRef = useRef<HTMLDivElement | null>(null);
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -91,7 +93,11 @@ export function CategoryList({
       <div
         className="categories"
         aria-busy="true"
-        aria-label="Loading categories"
+        aria-label={intl.formatMessage({
+          defaultMessage: "Loading categories",
+          description:
+            "Accessible label shown while the list of music categories is loading.",
+        })}
       >
         {SKELETON_WIDTHS_REM.map((w, i) => (
           <CategoryPillSkeleton key={i} widthRem={w} />
@@ -111,7 +117,10 @@ export function CategoryList({
         className={`category-pill ${activeId === null ? "active" : ""}`}
         onClick={() => onSelect(null)}
       >
-        All
+        <FormattedMessage
+          defaultMessage="All"
+          description="Label on the first category pill that shows all tracks (no category filter)."
+        />
       </button>
       {categories.map((cat) => (
         <button

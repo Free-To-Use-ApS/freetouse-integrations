@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FormattedMessage, useIntl } from "react-intl";
 import type { Track } from "@freetouse/api";
 import { getArtistNames } from "../utils/format";
 
@@ -7,17 +8,32 @@ interface AttributionModalProps {
   onClose: () => void;
 }
 
-function buildLines(track: Track): string[] {
+function buildLines(
+  track: Track,
+  intl: ReturnType<typeof useIntl>,
+): string[] {
   const artist = getArtistNames(track);
   return [
-    `Music track: ${track.title} by ${artist}`,
-    `Source: https://freetouse.com/music`,
+    intl.formatMessage(
+      {
+        defaultMessage: "Music track: {title} by {artist}",
+        description:
+          "First line of the attribution text the user copies into their content.",
+      },
+      { title: track.title, artist },
+    ),
+    intl.formatMessage({
+      defaultMessage: "Source: https://freetouse.com/music",
+      description:
+        "Second line of the attribution text — the source URL of the music library.",
+    }),
   ];
 }
 
 export function AttributionModal({ track, onClose }: AttributionModalProps) {
+  const intl = useIntl();
   const [copied, setCopied] = useState(false);
-  const lines = buildLines(track);
+  const lines = buildLines(track, intl);
   const artist = getArtistNames(track);
 
   // Close on Escape key for keyboard accessibility
@@ -57,13 +73,19 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
       >
         <div className="attribution-header">
           <span id="attribution-title" className="attribution-title">
-            Attribution is required
+            <FormattedMessage
+              defaultMessage="Attribution is required"
+              description="Title of the modal shown after a track is added to the design, reminding the user to credit the music."
+            />
           </span>
           <button
             type="button"
             className="attribution-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={intl.formatMessage({
+              defaultMessage: "Close",
+              description: "Accessible label for the modal's close button.",
+            })}
           >
             <svg
               width="16"
@@ -77,13 +99,19 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
           </button>
         </div>
         <p className="attribution-description">
-          <em>
-            <strong>
-              {track.title} by {artist}
-            </strong>
-          </em>{" "}
-          is free to use in non-commercial content as long as you provide
-          attribution.
+          <FormattedMessage
+            defaultMessage="<emph>{title} by {artist}</emph> is free to use in non-commercial content as long as you provide attribution."
+            description="Body text of the attribution modal explaining the user's licensing obligation."
+            values={{
+              title: track.title,
+              artist,
+              emph: (chunks) => (
+                <em>
+                  <strong>{chunks}</strong>
+                </em>
+              ),
+            }}
+          />
         </p>
         <div className="attribution-box">
           <div className="attribution-lines">
@@ -97,8 +125,32 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
             type="button"
             className={`attribution-copy-icon ${copied ? "copied" : ""}`}
             onClick={handleCopy}
-            title={copied ? "Copied!" : "Copy"}
-            aria-label={copied ? "Copied" : "Copy attribution"}
+            title={
+              copied
+                ? intl.formatMessage({
+                    defaultMessage: "Copied!",
+                    description:
+                      "Tooltip on the copy button right after a successful copy.",
+                  })
+                : intl.formatMessage({
+                    defaultMessage: "Copy",
+                    description:
+                      "Tooltip on the button that copies the attribution text to the clipboard.",
+                  })
+            }
+            aria-label={
+              copied
+                ? intl.formatMessage({
+                    defaultMessage: "Copied",
+                    description:
+                      "Accessible label on the copy button right after a successful copy.",
+                  })
+                : intl.formatMessage({
+                    defaultMessage: "Copy attribution",
+                    description:
+                      "Accessible label on the button that copies the attribution text to the clipboard.",
+                  })
+            }
           >
             {copied ? (
               <svg

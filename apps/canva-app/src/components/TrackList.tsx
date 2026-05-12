@@ -1,3 +1,4 @@
+import { FormattedMessage, useIntl } from "react-intl";
 import type { Track } from "@freetouse/api";
 import { requestOpenExternalUrl } from "@canva/platform";
 import { TrackItem } from "./TrackItem";
@@ -19,8 +20,17 @@ function SkeletonItem() {
 }
 
 function SkeletonList({ count = 12 }: { count?: number }) {
+  const intl = useIntl();
   return (
-    <div className="track-list" aria-busy="true" aria-label="Loading tracks">
+    <div
+      className="track-list"
+      aria-busy="true"
+      aria-label={intl.formatMessage({
+        defaultMessage: "Loading tracks",
+        description:
+          "Accessible label shown while the list of music tracks is loading.",
+      })}
+    >
       {Array.from({ length: count }, (_, i) => (
         <SkeletonItem key={i} />
       ))}
@@ -52,7 +62,14 @@ export function TrackList({
   }
 
   if (tracks.length === 0) {
-    return <p className="loading-text">No tracks found</p>;
+    return (
+      <p className="loading-text">
+        <FormattedMessage
+          defaultMessage="No tracks found"
+          description="Message shown when a search or category returns no tracks."
+        />
+      </p>
+    );
   }
 
   return (
@@ -65,14 +82,20 @@ export function TrackList({
           onFindSimilar={onFindSimilar}
         />
       ))}
-      {loading && <p className="loading-text">Loading...</p>}
+      {loading && (
+        <p className="loading-text">
+          <FormattedMessage
+            defaultMessage="Loading..."
+            description="Status text shown while more tracks are being fetched after the user clicks 'Load more'."
+          />
+        </p>
+      )}
       {hasMore && !loading && (
-        <button
-          type="button"
-          className="load-more-btn"
-          onClick={onLoadMore}
-        >
-          Load more
+        <button type="button" className="load-more-btn" onClick={onLoadMore}>
+          <FormattedMessage
+            defaultMessage="Load more"
+            description="Label on the button that loads the next page of tracks."
+          />
         </button>
       )}
       <div className="track-list-footer">
@@ -81,7 +104,10 @@ export function TrackList({
           className="footer-link"
           onClick={() => openLink("https://freetouse.com/music/plans")}
         >
-          Subscription Plans
+          <FormattedMessage
+            defaultMessage="Subscription Plans"
+            description="Footer link to the Free To Use subscription plans page."
+          />
         </button>
         <span className="footer-divider">·</span>
         <button
@@ -89,7 +115,10 @@ export function TrackList({
           className="footer-link"
           onClick={() => openLink("https://freetouse.com/usage-policy")}
         >
-          Usage Policy
+          <FormattedMessage
+            defaultMessage="Usage Policy"
+            description="Footer link to the Free To Use usage policy page."
+          />
         </button>
         <span className="footer-divider">·</span>
         <button
@@ -97,7 +126,10 @@ export function TrackList({
           className="footer-link"
           onClick={() => openLink("https://freetouse.com/faq")}
         >
-          FAQ
+          <FormattedMessage
+            defaultMessage="FAQ"
+            description="Footer link to the Free To Use FAQ page."
+          />
         </button>
         <span className="footer-divider">·</span>
         <button
@@ -105,7 +137,10 @@ export function TrackList({
           className="footer-link"
           onClick={() => openLink("https://freetouse.com/blog")}
         >
-          Blog
+          <FormattedMessage
+            defaultMessage="Blog"
+            description="Footer link to the Free To Use blog."
+          />
         </button>
       </div>
     </div>

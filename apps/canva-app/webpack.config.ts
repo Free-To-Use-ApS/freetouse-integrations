@@ -1,8 +1,13 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import webpack from "webpack";
+import { transform } from "@formatjs/ts-transformer";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** Must match the `--id-interpolation-pattern` used by `formatjs extract`
+ * so the message IDs in `messages_en.json` match what the runtime expects. */
+const FORMATJS_ID_PATTERN = "[sha512:contenthash:base64:6]";
 
 const config: webpack.Configuration = {
   mode: "development",
@@ -25,7 +30,21 @@ const config: webpack.Configuration = {
     rules: [
       {
         test: /\.tsx?$/,
-        use: "ts-loader",
+        use: {
+          loader: "ts-loader",
+          options: {
+            transpileOnly: true,
+            getCustomTransformers() {
+              return {
+                before: [
+                  transform({
+                    overrideIdFn: FORMATJS_ID_PATTERN,
+                  }),
+                ],
+              };
+            },
+          },
+        },
         exclude: /node_modules/,
       },
       {

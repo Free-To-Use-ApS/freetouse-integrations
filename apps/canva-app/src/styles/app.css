@@ -4,8 +4,29 @@
  * track list, fixed player bar with waveform at the bottom.
  * ------------------------------------------------------------------------- */
 
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;700;800&display=swap");
+/* Note: Nunito would be loaded from Google Fonts but Canva's CSP blocks
+ * external font requests. The app falls back to Montserrat / system-ui as
+ * declared in --ftu-font-family. To bundle Nunito locally, add the .woff2
+ * files and an @font-face declaration here. */
 @import "@freetouse/style/variables.css";
+
+/* ---------------------------------------------------------------------------
+ * Dark mode — Canva's AppUiProvider applies a `.dark` class to an ancestor
+ * when the user has dark theme enabled. We redefine the FTU "neutral"
+ * tokens inside that scope so every rule using var(--ftu-white) etc.
+ * automatically swaps to a dark-friendly value. Brand colors (primary
+ * purple, green, mid-greys) stay the same — they read well on both themes.
+ * ------------------------------------------------------------------------- */
+.dark {
+  --ftu-white: #1a1a1a;          /* panel background */
+  --ftu-lighter: #232323;        /* hover bg, tag bg, skeleton base */
+  --ftu-light: #2a2a2a;          /* active row bg, divider line */
+  --ftu-light-grey: #404040;     /* borders */
+  --ftu-light-grey-rgb: 64, 64, 64;
+  --ftu-secondary: #f0f0f0;      /* primary text */
+  --ftu-secondary-rgb: 240, 240, 240;
+  --ftu-black: #ffffff;          /* "darken on hover" inverts in dark mode */
+}
 
 html,
 body,
@@ -675,11 +696,12 @@ button.player-bar-title {
 }
 
 .skeleton {
+  /* Uses FTU neutral tokens so the shimmer adapts to dark mode automatically */
   background: linear-gradient(
     90deg,
-    #f7f7f7 25%,
-    #f2f2f2 50%,
-    #f7f7f7 75%
+    var(--ftu-lighter) 25%,
+    var(--ftu-light) 50%,
+    var(--ftu-lighter) 75%
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
@@ -726,12 +748,18 @@ button.player-bar-title {
   width: 2.125rem;
 }
 
-/* Skeleton category pills — inherits .category-pill's padding and
- * border-radius for an identical shape, plus .skeleton's shimmer animation.
- * The non-breaking space content (in the JSX) gives it natural row height. */
+/* Skeleton category pills — same exact shape and height as a real pill.
+ *
+ * .skeleton sets border-radius to --ftu-radius-sm (rounded square); restore
+ * the pill radius. min-height matches the real pill's intrinsic height
+ * (font-size 0.75rem × line-height 1.5 + 0.5rem vertical padding ≈ 1.625rem)
+ * so there's no layout shift when content loads. */
 .skeleton-pill {
   color: transparent;
   pointer-events: none;
+  border-radius: var(--ftu-radius-pill);
+  line-height: 1.5;
+  min-height: 1.625rem;
 }
 
 /* ---------------------------------------------------------------------------

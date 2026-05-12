@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { FormattedMessage, useIntl } from "react-intl";
 import { upload } from "@canva/asset";
 import { addAudioTrack } from "@canva/design";
 import { useFeatureSupport } from "@canva/app-hooks";
@@ -15,6 +16,7 @@ import {
 } from "../utils/format";
 
 export function Player() {
+  const intl = useIntl();
   const isSupported = useFeatureSupport();
   const canAdd = isSupported(addAudioTrack);
   const player = useAudioPlayer();
@@ -63,7 +65,14 @@ export function Player() {
           type="button"
           className="player-bar-cover-btn"
           onClick={openTrackPage}
-          aria-label={`Open ${track.title} on freetouse.com`}
+          aria-label={intl.formatMessage(
+            {
+              defaultMessage: "Open {title} on freetouse.com",
+              description:
+                "Accessible label for the player's cover image; clicking opens the track's page on freetouse.com.",
+            },
+            { title: track.title },
+          )}
         >
           <img
             className="player-bar-cover"
@@ -104,7 +113,19 @@ export function Player() {
           type="button"
           className={`player-bar-btn ${isPlaying ? "playing" : ""}`}
           onClick={() => (isPlaying ? pause() : resume())}
-          aria-label={isPlaying ? "Pause" : "Play"}
+          aria-label={
+            isPlaying
+              ? intl.formatMessage({
+                  defaultMessage: "Pause",
+                  description:
+                    "Accessible label for the pause button in the player bar.",
+                })
+              : intl.formatMessage({
+                  defaultMessage: "Play",
+                  description:
+                    "Accessible label for the play button in the player bar.",
+                })
+          }
         >
           {isPlaying ? (
             <svg
@@ -133,8 +154,16 @@ export function Player() {
           <button
             type="button"
             className="player-bar-btn"
-            title="Add to design"
-            aria-label="Add to design"
+            title={intl.formatMessage({
+              defaultMessage: "Add",
+              description:
+                "Tooltip on the player bar button that adds the current track to the user's Canva design.",
+            })}
+            aria-label={intl.formatMessage({
+              defaultMessage: "Add to design",
+              description:
+                "Accessible label for the player bar button that adds the current track to the user's Canva design.",
+            })}
             onClick={handleAddToDesign}
           >
             <svg
@@ -151,8 +180,16 @@ export function Player() {
         <button
           type="button"
           className="player-bar-btn"
-          title="Purchase License"
-          aria-label="Purchase License"
+          title={intl.formatMessage({
+            defaultMessage: "Purchase License",
+            description:
+              "Tooltip on the player bar button that opens the commercial license purchase page for the current track.",
+          })}
+          aria-label={intl.formatMessage({
+            defaultMessage: "Purchase License",
+            description:
+              "Accessible label for the player bar button that opens the commercial license purchase page.",
+          })}
           onClick={() =>
             requestOpenExternalUrl({ url: getLicenseUrl(track) })
           }
@@ -175,17 +212,28 @@ export function Player() {
         onSeek={handleSeek}
       />
       <div className="player-license">
-        <strong>{track.title}</strong> <strong>by</strong>{" "}
-        <strong>{artist}</strong> is licensed under the{" "}
-        <button
-          type="button"
-          className="player-license-link"
-          onClick={() =>
-            requestOpenExternalUrl({ url: "https://freetouse.com/license" })
-          }
-        >
-          <strong>Free To Use License</strong>
-        </button>
+        <FormattedMessage
+          defaultMessage="<b>{title}</b> <b>by</b> <b>{artist}</b> is licensed under the <link><b>Free To Use License</b></link>"
+          description="License attribution shown below the waveform in the player bar. {title} and {artist} are filled in; the link opens the Free To Use license page."
+          values={{
+            title: track.title,
+            artist,
+            b: (chunks) => <strong>{chunks}</strong>,
+            link: (chunks) => (
+              <button
+                type="button"
+                className="player-license-link"
+                onClick={() =>
+                  requestOpenExternalUrl({
+                    url: "https://freetouse.com/license",
+                  })
+                }
+              >
+                {chunks}
+              </button>
+            ),
+          }}
+        />
       </div>
     </div>
   );

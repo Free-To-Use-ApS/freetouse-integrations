@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "webpack serve --mode development",
-    "build": "webpack --mode production"
+    "build": "webpack --mode production && npm run extract",
+    "extract": "formatjs extract \"src/**/*.{ts,tsx}\" --out-file dist/messages_en.json --id-interpolation-pattern '[sha512:contenthash:base64:6]'"
   },
   "dependencies": {
     "@canva/app-hooks": "0.0.0-beta.4",
@@ -15,13 +16,16 @@
     "@canva/design": "^2.8.0",
     "@canva/intents": "^2.5.0",
     "@canva/platform": "^2.2.2",
+    "@formatjs/cli": "^6.14.5",
     "@freetouse/api": "*",
     "@freetouse/style": "*",
     "mobx": "^6.15.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "react-intl": "^7.1.11"
   },
   "devDependencies": {
+    "@formatjs/ts-transformer": "^4.4.7",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "css-loader": "^7.0.0",

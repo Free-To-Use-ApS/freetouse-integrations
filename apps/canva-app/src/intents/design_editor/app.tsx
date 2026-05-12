@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FormattedMessage } from "react-intl";
 import { useFeatureSupport } from "@canva/app-hooks";
 import { addAudioTrack } from "@canva/design";
 import { SearchBar } from "../../components/SearchBar";
@@ -267,7 +268,10 @@ export function App() {
             >
               <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
             </svg>
-            Related Tracks
+            <FormattedMessage
+              defaultMessage="Related Tracks"
+              description="Header label shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view."
+            />
           </button>
         ) : (
           <>
@@ -287,8 +291,10 @@ export function App() {
       <div className="app-content" ref={contentRef}>
         {!audioSupported && (
           <p className="loading-text">
-            Audio tracks aren't supported in this design type. Try a
-            presentation or video.
+            <FormattedMessage
+              defaultMessage="Audio tracks aren't supported in this design type. Try a presentation or video."
+              description="Notice shown when the user opens the app in a design type that doesn't allow audio (e.g. a static image)."
+            />
           </p>
         )}
         {audioSupported && (

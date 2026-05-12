@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { useIntl } from "react-intl";
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
 }
 
 export function SearchBar({ onSearch }: SearchBarProps) {
+  const intl = useIntl();
   const [value, setValue] = useState("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -14,12 +16,24 @@ export function SearchBar({ onSearch }: SearchBarProps) {
     return () => clearTimeout(timerRef.current);
   }, [value, onSearch]);
 
+  const placeholder = intl.formatMessage({
+    defaultMessage: "Search royalty-free music...",
+    description:
+      "Placeholder text in the search input at the top of the music app.",
+  });
+
+  const clearLabel = intl.formatMessage({
+    defaultMessage: "Clear search",
+    description:
+      "Accessible label for the button that clears the current search query.",
+  });
+
   return (
     <div className="search-container">
       <input
         className="search-input"
         type="text"
-        placeholder="Search royalty-free music..."
+        placeholder={placeholder}
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
@@ -28,7 +42,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
           type="button"
           className="search-clear"
           onClick={() => setValue("")}
-          aria-label="Clear search"
+          aria-label={clearLabel}
         >
           &times;
         </button>
