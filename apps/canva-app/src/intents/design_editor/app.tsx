@@ -263,9 +263,9 @@ export function App() {
             type="button"
             className="back-btn"
             title={intl.formatMessage({
-              defaultMessage: "Related Tracks",
+              defaultMessage: "Go back",
               description:
-                "Header label shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view.",
+                "Header back button shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view (category, search, or All).",
             })}
             onClick={handleBack}
           >
@@ -280,8 +280,8 @@ export function App() {
             </svg>
             <span className="back-btn-label">
               <FormattedMessage
-                defaultMessage="Related Tracks"
-                description="Header label shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view."
+                defaultMessage="Go back"
+                description="Header back button shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view (category, search, or All)."
               />
             </span>
           </button>

@@ -163,6 +163,148 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     play(queue[nextIdx]);
   }, [state.ended, state.track, play]);
 
+  // Latest-state ref so the media-session action handlers (registered once)
+  // can always read the freshest track / queue without re-binding.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  });
+
+  // Sync MediaMetadata + playbackState with the currently playing track so
+  // the OS / browser knows what's playing. This drives:
+  //   - macOS Now Playing widget + Touch Bar controls
+  //   - Keyboard media keys (play/pause/next/prev)
+  //   - Bluetooth headset / car stereo controls
+  //   - Browser-level media controls
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) {
+      return;
+    }
+
+    if (!state.track) {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = "none";
+      return;
+    }
+
+    const track = state.track;
+    const artist = track.artists.map(([, a]) => a.name).join(", ");
+    const artwork: MediaImage[] = [];
+    if (track.thumbnails?.sm)
+      artwork.push({ src: track.thumbnails.sm, sizes: "100x100", type: "image/jpeg" });
+    if (track.thumbnails?.md)
+      artwork.push({ src: track.thumbnails.md, sizes: "200x200", type: "image/jpeg" });
+    if (track.thumbnails?.lg)
+      artwork.push({ src: track.thumbnails.lg, sizes: "400x400", type: "image/jpeg" });
+    if (track.thumbnails?.xl)
+      artwork.push({ src: track.thumbnails.xl, sizes: "800x800", type: "image/jpeg" });
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title,
+      artist,
+      artwork,
+    });
+    navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
+  }, [state.track, state.isPlaying]);
+
+  // Register media session action handlers once. They reach for the latest
+  // state via stateRef / queueRef so they don't need to be re-registered on
+  // every track change.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) {
+      return;
+    }
+
+    const audio = audioRef.current!;
+    const ms = navigator.mediaSession;
+
+    const safeSet = (
+      action: MediaSessionAction,
+      handler: MediaSessionActionHandler | null,
+    ) => {
+      try {
+        ms.setActionHandler(action, handler);
+      } catch {
+        // Not all actions are supported in every browser — silently skip.
+      }
+    };
+
+    safeSet("play", () => {
+      audio.play().catch(() => {});
+    });
+    safeSet("pause", () => {
+      audio.pause();
+    });
+    safeSet("previoustrack", () => {
+      const t = stateRef.current.track;
+      const queue = queueRef.current;
+      if (!t || queue.length === 0) return;
+      const idx = queue.findIndex((x) => x.id === t.id);
+      const prevIdx =
+        idx === -1 || idx === 0 ? queue.length - 1 : idx - 1;
+      play(queue[prevIdx]);
+    });
+    safeSet("nexttrack", () => {
+      const t = stateRef.current.track;
+      const queue = queueRef.current;
+      if (!t || queue.length === 0) return;
+      const idx = queue.findIndex((x) => x.id === t.id);
+      const nextIdx = idx === -1 ? 0 : (idx + 1) % queue.length;
+      play(queue[nextIdx]);
+    });
+    safeSet("seekto", (details) => {
+      if (details.seekTime != null && Number.isFinite(details.seekTime)) {
+        audio.currentTime = details.seekTime;
+      }
+    });
+    safeSet("seekbackward", (details) => {
+      const step = details.seekOffset ?? 10;
+      audio.currentTime = Math.max(0, audio.currentTime - step);
+    });
+    safeSet("seekforward", (details) => {
+      const step = details.seekOffset ?? 10;
+      audio.currentTime = Math.min(
+        audio.duration || 0,
+        audio.currentTime + step,
+      );
+    });
+    safeSet("stop", () => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+
+    return () => {
+      safeSet("play", null);
+      safeSet("pause", null);
+      safeSet("previoustrack", null);
+      safeSet("nexttrack", null);
+      safeSet("seekto", null);
+      safeSet("seekbackward", null);
+      safeSet("seekforward", null);
+      safeSet("stop", null);
+    };
+  }, [play]);
+
+  // Keep the OS-level position state in sync so scrubbing on the Now Playing
+  // widget reflects actual progress (otherwise the slider stays at 0).
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) {
+      return;
+    }
+    const ms = navigator.mediaSession;
+    if (!state.track || !state.duration) return;
+    if (typeof ms.setPositionState !== "function") return;
+    try {
+      ms.setPositionState({
+        duration: state.duration,
+        playbackRate: 1,
+        position: Math.min(state.currentTime, state.duration),
+      });
+    } catch {
+      // Ignore — some browsers throw on rapid updates.
+    }
+  }, [state.track, state.duration, state.currentTime]);
+
   const value = useMemo<AudioPlayerContextValue>(
     () => ({ ...state, play, pause, resume, toggle, seek, isCurrent }),
     [state, play, pause, resume, toggle, seek, isCurrent],

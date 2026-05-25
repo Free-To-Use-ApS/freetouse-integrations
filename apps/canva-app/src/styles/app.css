@@ -13,27 +13,33 @@
 /* ---------------------------------------------------------------------------
  * Theme integration with Canva
  *
- * Map FTU "neutral" tokens (white, greys, text colors) to Canva's
- * functional color tokens. These tokens automatically swap between light
- * and dark themes and maintain WCAG contrast ratios — required by the
- * Canva App Marketplace review process.
+ * Map the highest-level neutral tokens (page background, primary text,
+ * borders) to Canva's functional color tokens. These auto-adapt to the
+ * active theme and maintain WCAG contrast ratios — required by the Canva
+ * App Marketplace review process.
  *
- * Brand tokens (--ftu-primary, --ftu-green) stay hardcoded so the Free To
- * Use purple/green identity is preserved as accents (active category pill,
- * played waveform, copy-success state) on both themes.
+ * All other FTU tokens (--ftu-lighter, --ftu-light, --ftu-grey,
+ * --ftu-grey-hover, --ftu-black, --ftu-primary, --ftu-green) keep their
+ * brand values from @freetouse/style/variables.css so the visual identity
+ * matches freetouse.com and our Chrome extension. The .dark block below
+ * swaps the decorative backgrounds when the user is in dark mode.
  * ------------------------------------------------------------------------- */
 :root {
-  /* Surface colors */
-  --ftu-white: var(--ui-kit-color-control-bg);
-  --ftu-lighter: var(--ui-kit-color-action-tertiary-bg);
-  --ftu-light: var(--ui-kit-color-action-tertiary-bg-hovered);
-  --ftu-light-grey: var(--ui-kit-color-control-border);
+  --ftu-white: var(--ui-kit-color-control-bg);        /* page / panel bg */
+  --ftu-secondary: var(--ui-kit-color-content-fg);    /* primary text */
+  --ftu-light-grey: var(--ui-kit-color-control-border); /* borders */
+}
 
-  /* Text colors */
-  --ftu-secondary: var(--ui-kit-color-content-fg);
-  --ftu-grey: var(--ui-kit-color-content-subtle-fg);
-  --ftu-grey-hover: var(--ui-kit-color-content-fg);
-  --ftu-black: var(--ui-kit-color-content-fg);
+/* Dark-mode overrides for the FTU decorative tokens. Canva applies a
+ * `.dark` class to an ancestor when the user has dark theme enabled.
+ * "Hover" semantics invert: in light mode emphasis means darker; in dark
+ * mode emphasis means lighter (otherwise hover text disappears into the
+ * lighter hover background). */
+.dark {
+  --ftu-lighter: #232323;     /* tag bg, hover row, skeleton base */
+  --ftu-light: #2a2a2a;       /* active row bg, divider line */
+  --ftu-black: #ffffff;       /* "darken on hover" inverts in dark mode */
+  --ftu-grey-hover: #d6d6d6;  /* inverts: lighter (not darker) for hover emphasis */
 }
 
 html,
@@ -43,6 +49,9 @@ body,
   padding: 0;
   height: 100%;
   overflow: hidden;
+  /* All three levels share the same background so no other layer (Canva's
+   * iframe outer bg, etc.) can show through at the edges in any theme. */
+  background: var(--ftu-white);
 }
 
 /* Canva's UI Kit stylesheet sets `html { font-size: 62.5% }` (=10px) as a
@@ -222,8 +231,8 @@ button {
 }
 
 .category-pill:hover {
-  background: var(--ui-kit-color-action-tertiary-bg-pressed);
-  color: var(--ui-kit-color-content-fg);
+  background: rgba(var(--ftu-light-grey-rgb), 0.45);
+  color: var(--ftu-grey-hover);
 }
 
 .category-pill.active {
@@ -652,7 +661,8 @@ button.player-bar-title {
 }
 
 .load-more-btn:hover {
-  background: var(--ui-kit-color-action-tertiary-bg-pressed);
+  background: rgba(var(--ftu-light-grey-rgb), 0.45);
+  color: var(--ftu-grey-hover);
 }
 
 .track-list-footer {
