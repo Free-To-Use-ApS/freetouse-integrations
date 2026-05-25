@@ -53,9 +53,34 @@ export function TrackList({
   onLoadMore,
   onFindSimilar,
 }: TrackListProps) {
+  const intl = useIntl();
   const openLink = (url: string) => {
     requestOpenExternalUrl({ url });
   };
+
+  // Footer link labels — formatted as strings so we can pass them both as
+  // the visible label AND as the `title` attribute, which shows the full
+  // text in a tooltip when the visible label is truncated by ellipsis.
+  const plansLabel = intl.formatMessage({
+    defaultMessage: "Subscription Plans",
+    description: "Footer link to the Free To Use subscription plans page.",
+  });
+  const usageLabel = intl.formatMessage({
+    defaultMessage: "Usage Policy",
+    description: "Footer link to the Free To Use usage policy page.",
+  });
+  const faqLabel = intl.formatMessage({
+    defaultMessage: "FAQ",
+    description: "Footer link to the Free To Use FAQ page.",
+  });
+  const blogLabel = intl.formatMessage({
+    defaultMessage: "Blog",
+    description: "Footer link to the Free To Use blog.",
+  });
+  const loadMoreLabel = intl.formatMessage({
+    defaultMessage: "Load more",
+    description: "Label on the button that loads the next page of tracks.",
+  });
 
   if (tracks.length === 0 && loading) {
     return <SkeletonList />;
@@ -91,56 +116,50 @@ export function TrackList({
         </p>
       )}
       {hasMore && !loading && (
-        <button type="button" className="load-more-btn" onClick={onLoadMore}>
-          <FormattedMessage
-            defaultMessage="Load more"
-            description="Label on the button that loads the next page of tracks."
-          />
+        <button
+          type="button"
+          className="load-more-btn"
+          title={loadMoreLabel}
+          onClick={onLoadMore}
+        >
+          {loadMoreLabel}
         </button>
       )}
       <div className="track-list-footer">
         <button
           type="button"
           className="footer-link"
+          title={plansLabel}
           onClick={() => openLink("https://freetouse.com/music/plans")}
         >
-          <FormattedMessage
-            defaultMessage="Subscription Plans"
-            description="Footer link to the Free To Use subscription plans page."
-          />
+          {plansLabel}
         </button>
         <span className="footer-divider">·</span>
         <button
           type="button"
           className="footer-link"
+          title={usageLabel}
           onClick={() => openLink("https://freetouse.com/usage-policy")}
         >
-          <FormattedMessage
-            defaultMessage="Usage Policy"
-            description="Footer link to the Free To Use usage policy page."
-          />
+          {usageLabel}
         </button>
         <span className="footer-divider">·</span>
         <button
           type="button"
           className="footer-link"
+          title={faqLabel}
           onClick={() => openLink("https://freetouse.com/faq")}
         >
-          <FormattedMessage
-            defaultMessage="FAQ"
-            description="Footer link to the Free To Use FAQ page."
-          />
+          {faqLabel}
         </button>
         <span className="footer-divider">·</span>
         <button
           type="button"
           className="footer-link"
+          title={blogLabel}
           onClick={() => openLink("https://freetouse.com/blog")}
         >
-          <FormattedMessage
-            defaultMessage="Blog"
-            description="Footer link to the Free To Use blog."
-          />
+          {blogLabel}
         </button>
       </div>
     </div>

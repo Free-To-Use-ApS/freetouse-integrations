@@ -132,6 +132,11 @@ export function TrackItem({ track, queue, onFindSimilar }: TrackItemProps) {
         <button
           type="button"
           className="track-action-btn track-action-btn--text"
+          title={intl.formatMessage({
+            defaultMessage: "Find Similar",
+            description:
+              "Hover action on a track that opens a list of tracks similar to it.",
+          })}
           onClick={(e) => {
             e.stopPropagation();
             onFindSimilar(track.id);

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Royalty Free Music for Creators | Free To Use",
   "version": "1.0.0",
-  "description": "Royalty-free background music for creators – completely free, sign-up not even required. Just unlimited free downloads of safe, high-quality music with no copyright issues.",
+  "description": "Royalty-free background music – completely free, sign-up not even required.",
   "permissions": ["offscreen", "downloads", "downloads.shelf", "storage"],
   "host_permissions": ["https://*.freetouse.com/*"],
   "action": {

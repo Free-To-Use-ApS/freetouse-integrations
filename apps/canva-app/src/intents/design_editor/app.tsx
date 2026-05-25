@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FormattedMessage } from "react-intl";
+import { FormattedMessage, useIntl } from "react-intl";
 import { useFeatureSupport } from "@canva/app-hooks";
 import { addAudioTrack } from "@canva/design";
 import { SearchBar } from "../../components/SearchBar";
@@ -20,6 +20,7 @@ interface SavedView {
 const PAGE_SIZE_BACK = 20;
 
 export function App() {
+  const intl = useIntl();
   const isSupported = useFeatureSupport();
   const audioSupported = isSupported(addAudioTrack);
 
@@ -258,7 +259,16 @@ export function App() {
     <div className="app">
       <div className="app-header">
         {relatedToId ? (
-          <button type="button" className="back-btn" onClick={handleBack}>
+          <button
+            type="button"
+            className="back-btn"
+            title={intl.formatMessage({
+              defaultMessage: "Related Tracks",
+              description:
+                "Header label shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view.",
+            })}
+            onClick={handleBack}
+          >
             <svg
               width="18"
               height="18"
@@ -268,10 +278,12 @@ export function App() {
             >
               <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
             </svg>
-            <FormattedMessage
-              defaultMessage="Related Tracks"
-              description="Header label shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view."
-            />
+            <span className="back-btn-label">
+              <FormattedMessage
+                defaultMessage="Related Tracks"
+                description="Header label shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view."
+              />
+            </span>
           </button>
         ) : (
           <>

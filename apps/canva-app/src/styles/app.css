@@ -11,21 +11,29 @@
 @import "@freetouse/style/variables.css";
 
 /* ---------------------------------------------------------------------------
- * Dark mode — Canva's AppUiProvider applies a `.dark` class to an ancestor
- * when the user has dark theme enabled. We redefine the FTU "neutral"
- * tokens inside that scope so every rule using var(--ftu-white) etc.
- * automatically swaps to a dark-friendly value. Brand colors (primary
- * purple, green, mid-greys) stay the same — they read well on both themes.
+ * Theme integration with Canva
+ *
+ * Map FTU "neutral" tokens (white, greys, text colors) to Canva's
+ * functional color tokens. These tokens automatically swap between light
+ * and dark themes and maintain WCAG contrast ratios — required by the
+ * Canva App Marketplace review process.
+ *
+ * Brand tokens (--ftu-primary, --ftu-green) stay hardcoded so the Free To
+ * Use purple/green identity is preserved as accents (active category pill,
+ * played waveform, copy-success state) on both themes.
  * ------------------------------------------------------------------------- */
-.dark {
-  --ftu-white: #1a1a1a;          /* panel background */
-  --ftu-lighter: #232323;        /* hover bg, tag bg, skeleton base */
-  --ftu-light: #2a2a2a;          /* active row bg, divider line */
-  --ftu-light-grey: #404040;     /* borders */
-  --ftu-light-grey-rgb: 64, 64, 64;
-  --ftu-secondary: #f0f0f0;      /* primary text */
-  --ftu-secondary-rgb: 240, 240, 240;
-  --ftu-black: #ffffff;          /* "darken on hover" inverts in dark mode */
+:root {
+  /* Surface colors */
+  --ftu-white: var(--ui-kit-color-control-bg);
+  --ftu-lighter: var(--ui-kit-color-action-tertiary-bg);
+  --ftu-light: var(--ui-kit-color-action-tertiary-bg-hovered);
+  --ftu-light-grey: var(--ui-kit-color-control-border);
+
+  /* Text colors */
+  --ftu-secondary: var(--ui-kit-color-content-fg);
+  --ftu-grey: var(--ui-kit-color-content-subtle-fg);
+  --ftu-grey-hover: var(--ui-kit-color-content-fg);
+  --ftu-black: var(--ui-kit-color-content-fg);
 }
 
 html,
@@ -214,8 +222,8 @@ button {
 }
 
 .category-pill:hover {
-  background: rgba(var(--ftu-light-grey-rgb), 0.45);
-  color: #5e656b;
+  background: var(--ui-kit-color-action-tertiary-bg-pressed);
+  color: var(--ui-kit-color-content-fg);
 }
 
 .category-pill.active {
@@ -350,6 +358,9 @@ button {
   font-size: 0.75rem;
   font-weight: var(--ftu-font-weight-medium);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
   color: var(--ftu-primary);
   border-radius: 0;
 }
@@ -411,6 +422,17 @@ button {
   color: var(--ftu-grey);
   cursor: pointer;
   padding: 0.375rem 0;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Localized text inside the back button — truncates with ellipsis if a
+ * translation is too long. Full text remains in the title tooltip. */
+.back-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .back-btn:hover {
@@ -623,10 +645,14 @@ button.player-bar-title {
   font-weight: var(--ftu-font-weight-medium);
   cursor: pointer;
   transition: background-color var(--ftu-transition-speed);
+  /* Truncate long localized labels; full text in title tooltip. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .load-more-btn:hover {
-  background: rgba(var(--ftu-light-grey-rgb), 0.45);
+  background: var(--ui-kit-color-action-tertiary-bg-pressed);
 }
 
 .track-list-footer {
@@ -649,6 +675,15 @@ button.player-bar-title {
   cursor: pointer;
   font-family: inherit;
   transition: color var(--ftu-transition-speed);
+
+  /* Truncate when localized text gets too long; full text remains
+   * available via the title attribute (tooltip on hover). */
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
 }
 
 .footer-link:hover {
