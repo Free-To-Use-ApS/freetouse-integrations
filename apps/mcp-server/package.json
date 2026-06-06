@@ -1,0 +1,26 @@
+{
+  "name": "ftu-mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Free To Use MCP server: a search_music tool that finds royalty-free tracks by mood/genre/tags and returns text + listen/download links everywhere, plus an inline player widget where the host supports MCP Apps UI.",
+  "scripts": {
+    "build": "esbuild src/widget-client.ts --bundle --format=iife --platform=browser --target=es2020 --minify --outfile=dist/widget-client.js && tsc",
+    "start": "node dist/server.js",
+    "dev": "npm run build && node dist/server.js",
+    "tunnel": "bash start.sh"
+  },
+  "dependencies": {
+    "@freetouse/api": "*",
+    "@modelcontextprotocol/ext-apps": "^1.7.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.5.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}

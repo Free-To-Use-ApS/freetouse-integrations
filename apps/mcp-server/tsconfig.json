@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": false
+  },
+  "include": ["src"],
+  "// exclude widget-client": "bundled by esbuild (browser IIFE); tsc must not recompile it to dist/widget-client.js and clobber the bundle",
+  "exclude": ["src/widget-client.ts"]
+}
