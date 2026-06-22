@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
+import { Box, SurfaceHeader, Text } from "@canva/app-ui-kit";
 import { useFeatureSupport } from "@canva/app-hooks";
 import { addAudioTrack } from "@canva/design";
 import { SearchBar } from "../../components/SearchBar";
@@ -257,36 +258,35 @@ export function App() {
 
   return (
     <div className="app">
-      <div className="app-header">
+      <div className="app-top">
         {relatedToId ? (
-          <button
-            type="button"
-            className="back-btn"
+          <SurfaceHeader
             title={intl.formatMessage({
-              defaultMessage: "Go back",
+              defaultMessage: "Similar music",
               description:
-                "Header back button shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view (category, search, or All).",
+                "Header title shown when viewing tracks similar to one the user picked.",
             })}
-            onClick={handleBack}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
-            </svg>
-            <span className="back-btn-label">
-              <FormattedMessage
-                defaultMessage="Go back"
-                description="Header back button shown when viewing tracks similar to one the user clicked Find Similar on. Clicking returns to the previous view (category, search, or All)."
-              />
-            </span>
-          </button>
+            start={{
+              ariaLabel: intl.formatMessage({
+                defaultMessage: "Go back",
+                description:
+                  "Accessible label for the back button that returns from the similar-tracks view.",
+              }),
+              onClick: handleBack,
+            }}
+          />
         ) : (
-          <>
+          <SurfaceHeader
+            title={intl.formatMessage({
+              defaultMessage: "Music",
+              description: "Header title for the main music browsing view.",
+            })}
+            divider={false}
+          />
+        )}
+
+        {!relatedToId && (
+          <div className="app-controls">
             <SearchBar onSearch={handleSearch} />
             {!query && (
               <CategoryList
@@ -296,22 +296,24 @@ export function App() {
                 onSelect={handleCategorySelect}
               />
             )}
-          </>
+          </div>
         )}
       </div>
 
       <div className="app-content" ref={contentRef}>
-        {!audioSupported && (
-          <p className="loading-text">
-            <FormattedMessage
-              defaultMessage="Audio tracks aren't supported in this design type. Try a presentation or video."
-              description="Notice shown when the user opens the app in a design type that doesn't allow audio (e.g. a static image)."
-            />
-          </p>
-        )}
-        {audioSupported && (
+        {!audioSupported ? (
+          <Box paddingY="4u" paddingX="2u">
+            <Text size="small" tone="secondary" alignment="center">
+              <FormattedMessage
+                defaultMessage="Audio tracks aren't supported in this design type. Try a presentation or video."
+                description="Notice shown when the user opens the app in a design type that doesn't allow audio (e.g. a static image)."
+              />
+            </Text>
+          </Box>
+        ) : (
           <TrackList
             tracks={tracks}
+            query={query}
             loading={loading}
             hasMore={hasMore}
             onLoadMore={loadMore}

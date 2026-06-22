@@ -3,10 +3,10 @@ import type { DesignEditorIntent } from "@canva/intents/design";
 import { createRoot } from "react-dom/client";
 import type { ReactNode } from "react";
 import { IntlProvider } from "react-intl";
-import { AppUiProvider } from "@canva/app-ui-kit";
+import { AppUiProvider, AudioContextProvider } from "@canva/app-ui-kit";
 import { AppI18nProvider } from "@canva/app-i18n-kit";
 import { App } from "./app";
-import { AudioPlayerProvider } from "../../hooks/useAudioPlayer";
+import { NowPlayingProvider } from "../../hooks/useNowPlaying";
 import { AttributionModalProvider } from "../../hooks/useAttributionModal";
 
 /**
@@ -41,11 +41,16 @@ const render = async () => {
   root.render(
     <I18nRoot>
       <AppUiProvider>
-        <AudioPlayerProvider>
-          <AttributionModalProvider>
-            <App />
-          </AttributionModalProvider>
-        </AudioPlayerProvider>
+        {/* AudioContextProvider (Kit) ensures only one AudioCard plays at a
+            time. NowPlayingProvider layers progress / autoplay / media-keys on
+            top of that for the bottom waveform bar. */}
+        <AudioContextProvider>
+          <NowPlayingProvider>
+            <AttributionModalProvider>
+              <App />
+            </AttributionModalProvider>
+          </NowPlayingProvider>
+        </AudioContextProvider>
       </AppUiProvider>
     </I18nRoot>
   );

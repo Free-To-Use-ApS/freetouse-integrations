@@ -1,4 +1,3 @@
-import { useCallback, useRef } from "react";
 import { useIntl } from "react-intl";
 
 interface WaveformProps {
@@ -6,8 +5,6 @@ interface WaveformProps {
   data: number[];
   /** 0–1 progress through the track */
   progress: number;
-  /** Called with a 0–1 value when the user clicks/drags to seek */
-  onSeek: (fraction: number) => void;
 }
 
 /** Number of bars to render — fits the bottom player nicely. */
@@ -27,70 +24,27 @@ function downsample(data: number[], bars: number): number[] {
   return result;
 }
 
-export function Waveform({ data, progress, onSeek }: WaveformProps) {
+/**
+ * Display-only waveform progress visualization for the bottom Now Playing bar.
+ *
+ * This is the one custom component Canva's review allows (a waveform scrubber),
+ * styled with Kit color tokens. It shows playback progress (played bars in the
+ * brand color, unplayed in a subtle content color). It is not click-to-seek:
+ * the Kit AudioCard owns playback and exposes no seek API.
+ */
+export function Waveform({ data, progress }: WaveformProps) {
   const intl = useIntl();
-  const containerRef = useRef<HTMLDivElement>(null);
   const bars = downsample(data, BAR_COUNT);
-
-  const seekFromX = useCallback(
-    (clientX: number) => {
-      const el = containerRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      // Subtract horizontal padding so the fraction is computed against the
-      // actual bar area, not the full element width. Without this, clicks
-      // near the right edge land "before" where the cursor is because the
-      // right padding eats part of the divisor.
-      const styles = getComputedStyle(el);
-      const padLeft = parseFloat(styles.paddingLeft) || 0;
-      const padRight = parseFloat(styles.paddingRight) || 0;
-      const innerLeft = rect.left + padLeft;
-      const innerWidth = rect.width - padLeft - padRight;
-      if (innerWidth <= 0) return;
-      const fraction = Math.max(
-        0,
-        Math.min(1, (clientX - innerLeft) / innerWidth),
-      );
-      onSeek(fraction);
-    },
-    [onSeek],
-  );
-
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const target = e.currentTarget;
-      target.setPointerCapture(e.pointerId);
-      seekFromX(e.clientX);
-
-      const handleMove = (ev: PointerEvent) => {
-        if (target.hasPointerCapture(ev.pointerId)) seekFromX(ev.clientX);
-      };
-      const handleUp = (ev: PointerEvent) => {
-        target.releasePointerCapture(ev.pointerId);
-        target.removeEventListener("pointermove", handleMove);
-        target.removeEventListener("pointerup", handleUp);
-        target.removeEventListener("pointercancel", handleUp);
-      };
-
-      target.addEventListener("pointermove", handleMove);
-      target.addEventListener("pointerup", handleUp);
-      target.addEventListener("pointercancel", handleUp);
-    },
-    [seekFromX],
-  );
-
   const playedIndex = Math.floor(progress * BAR_COUNT);
 
   return (
     <div
-      ref={containerRef}
       className="ftu-wave"
-      onPointerDown={handlePointerDown}
-      role="slider"
+      role="progressbar"
       aria-label={intl.formatMessage({
-        defaultMessage: "Track progress",
+        defaultMessage: "Playback progress",
         description:
-          "Accessible label for the waveform scrubber that shows / controls playback position.",
+          "Accessible label for the waveform that shows the playing track's progress.",
       })}
       aria-valuemin={0}
       aria-valuemax={100}

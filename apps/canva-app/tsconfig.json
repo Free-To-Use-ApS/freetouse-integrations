@@ -9,6 +9,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "outDir": "dist",
     "sourceMap": true,
     "lib": ["DOM", "DOM.Iterable", "ES2019"]
