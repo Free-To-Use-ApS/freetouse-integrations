@@ -4,6 +4,7 @@ import { Box, SurfaceHeader, Text } from "@canva/app-ui-kit";
 import { useFeatureSupport } from "@canva/app-hooks";
 import { addAudioTrack } from "@canva/design";
 import { SearchBar } from "../../components/SearchBar";
+import { LinksMenu } from "../../components/LinksMenu";
 import { CategoryList } from "../../components/CategoryList";
 import { TrackList } from "../../components/TrackList";
 import { Player } from "../../components/Player";
@@ -287,7 +288,12 @@ export function App() {
 
         {!relatedToId && (
           <div className="app-controls">
-            <SearchBar onSearch={handleSearch} />
+            <div className="app-search-row">
+              <div className="app-search-grow">
+                <SearchBar onSearch={handleSearch} />
+              </div>
+              <LinksMenu />
+            </div>
             {!query && (
               <CategoryList
                 categories={categories}

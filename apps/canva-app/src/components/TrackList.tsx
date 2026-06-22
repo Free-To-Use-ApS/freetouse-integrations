@@ -5,9 +5,6 @@ import {
   Button,
   Column,
   Columns,
-  FlyoutMenu,
-  FlyoutMenuItem,
-  OpenInNewIcon,
   Placeholder,
   Rows,
   Text,
@@ -16,7 +13,6 @@ import {
   TitlePlaceholder,
 } from "@canva/app-ui-kit";
 import type { Track } from "@freetouse/api";
-import { requestOpenExternalUrl } from "@canva/platform";
 import { TrackItem } from "./TrackItem";
 import { useNowPlayingControls } from "../hooks/useNowPlaying";
 
@@ -83,9 +79,6 @@ export function TrackList({
     setQueue(tracks);
   }, [tracks, setQueue]);
 
-  const openLink = (url: string) => requestOpenExternalUrl({ url });
-  const externalIcon = () => <OpenInNewIcon />;
-
   if (tracks.length === 0 && loading) {
     return <SkeletonList />;
   }
@@ -145,65 +138,6 @@ export function TrackList({
           })}
         </Button>
       )}
-
-      <Box paddingTop="1u">
-        <Columns spacing="0" align="center">
-          <Column width="content">
-            <FlyoutMenu
-              label={intl.formatMessage({
-                defaultMessage: "Free To Use links",
-                description:
-                  "Label of the secondary button that opens a menu of external Free To Use links.",
-              })}
-              ariaLabel={intl.formatMessage({
-                defaultMessage: "Free To Use links",
-                description: "Accessible label for the external links menu.",
-              })}
-              tone="secondary"
-              icon={externalIcon}
-              iconPosition="end"
-              flyoutPlacement="bottom-start"
-            >
-              <FlyoutMenuItem
-                end={externalIcon}
-                onClick={() => openLink("https://freetouse.com/music/plans")}
-              >
-                {intl.formatMessage({
-                  defaultMessage: "Free To Use Plans",
-                  description: "External link to the subscription plans page.",
-                })}
-              </FlyoutMenuItem>
-              <FlyoutMenuItem
-                end={externalIcon}
-                onClick={() => openLink("https://freetouse.com/usage-policy")}
-              >
-                {intl.formatMessage({
-                  defaultMessage: "Usage Policy",
-                  description: "External link to the usage policy page.",
-                })}
-              </FlyoutMenuItem>
-              <FlyoutMenuItem
-                end={externalIcon}
-                onClick={() => openLink("https://freetouse.com/faq")}
-              >
-                {intl.formatMessage({
-                  defaultMessage: "FAQ",
-                  description: "External link to the FAQ page.",
-                })}
-              </FlyoutMenuItem>
-              <FlyoutMenuItem
-                end={externalIcon}
-                onClick={() => openLink("https://freetouse.com/blog")}
-              >
-                {intl.formatMessage({
-                  defaultMessage: "Blog",
-                  description: "External link to the Free To Use blog.",
-                })}
-              </FlyoutMenuItem>
-            </FlyoutMenu>
-          </Column>
-        </Columns>
-      </Box>
     </Rows>
   );
 }

@@ -51,6 +51,18 @@ body,
   padding: 12px;
 }
 
+/* Search field + "..." overflow menu on one row */
+.app-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-search-grow {
+  flex: 1;
+  min-width: 0;
+}
+
 .app-content {
   flex: 1;
   overflow-y: auto;
@@ -159,7 +171,9 @@ body,
   flex: 1 1 0;
   min-height: 2px;
   border-radius: 1px;
-  background: var(--ui-kit-color-content-subtlest-fg);
+  /* Unplayed bars: a light, subtle grey (the border token reads lighter than
+   * the subtlest text token, matching Canva's mock). */
+  background: var(--ui-kit-color-control-border);
   transition: background-color 200ms ease;
 }
 

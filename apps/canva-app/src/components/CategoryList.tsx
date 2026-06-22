@@ -48,6 +48,7 @@ export function CategoryList({
     <Pill
       key="all"
       role="switch"
+      size="small"
       text={intl.formatMessage({
         defaultMessage: "All",
         description:
@@ -60,6 +61,7 @@ export function CategoryList({
       <Pill
         key={cat.id}
         role="switch"
+        size="small"
         text={cat.name}
         maxWidth="25u"
         selected={activeId === cat.id}

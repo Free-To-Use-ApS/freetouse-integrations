@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
   Button,
+  Link,
   PauseIcon,
   PlayFilledIcon,
   PlusIcon,
@@ -122,9 +123,29 @@ export function Player() {
       <div className="ftu-np-license">
         <Text size="xsmall" tone="tertiary">
           <FormattedMessage
-            defaultMessage="{title} by {artist} is licensed under the Free To Use License."
-            description="License attribution line shown beneath the now-playing waveform."
-            values={{ title: track.title, artist }}
+            defaultMessage="{title} by {artist} is licensed under the <link>Free To Use License</link>"
+            description="License attribution line shown beneath the now-playing waveform. The link opens the Free To Use license page."
+            values={{
+              title: track.title,
+              artist,
+              link: (chunks) => (
+                <Link
+                  href="https://freetouse.com/license"
+                  requestOpenExternalUrl={() =>
+                    requestOpenExternalUrl({
+                      url: "https://freetouse.com/license",
+                    })
+                  }
+                  ariaLabel={intl.formatMessage({
+                    defaultMessage: "Open the Free To Use License",
+                    description:
+                      "Accessible label for the license link in the attribution line.",
+                  })}
+                >
+                  {chunks}
+                </Link>
+              ),
+            }}
           />
         </Text>
       </div>

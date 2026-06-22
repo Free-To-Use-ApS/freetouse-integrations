@@ -1,6 +1,13 @@
 import { useCallback, useRef } from "react";
 import { useIntl } from "react-intl";
-import { AudioCard, Text, SearchIcon, type AudioCardRef } from "@canva/app-ui-kit";
+import {
+  AudioCard,
+  Button,
+  PlusIcon,
+  SearchIcon,
+  Text,
+  type AudioCardRef,
+} from "@canva/app-ui-kit";
 import type { Track, TrackCategory } from "@freetouse/api";
 import { upload } from "@canva/asset";
 import { addAudioTrack, ui } from "@canva/design";
@@ -48,10 +55,13 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
   const tags = getTagLabels(track);
   const isActive = activeTrackId === track.id;
 
-  // Keep the latest track in a ref so the AudioCard callbacks can stay stable
-  // (a changing onEnded identity would make AudioCard recreate its <audio>).
+  // Keep the latest track + this card's ref + playing flag in refs so the
+  // AudioCard callbacks can stay stable (a changing onEnded identity would
+  // make AudioCard recreate its <audio> element every render).
   const trackRef = useRef(track);
   trackRef.current = track;
+  const cardRef = useRef<AudioCardRef | null>(null);
+  const playingRef = useRef(false);
 
   const uploadAudio = useCallback(
     () =>
@@ -77,8 +87,6 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
     if (!canAdd) return;
     ui.startDragToPoint(event, {
       type: "audio",
-      // Show the attribution modal as soon as Canva resolves the asset
-      // (i.e. the user successfully dropped the track into their design).
       resolveAudioRef: async () => {
         const result = await uploadAudio();
         showAttribution(track);
@@ -89,30 +97,53 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
     });
   };
 
-  // Register/unregister this card's imperative ref so the bottom waveform bar
-  // and autoplay can control playback. registerCard is stable.
+  // Register/unregister this card's imperative ref (stable).
   const setCardRef = useCallback(
-    (ref: AudioCardRef | null) => registerCard(track.id, ref),
+    (ref: AudioCardRef | null) => {
+      cardRef.current = ref;
+      registerCard(track.id, ref);
+    },
     [registerCard, track.id],
   );
 
-  // Stable AudioCard callbacks (read the latest track via ref) so the card's
-  // internal effects never re-run and never recreate the audio element.
+  // Clicking the card body toggles playback (per product preference). The
+  // built-in cover play button also works; add-to-design is the + button.
+  const handleCardClick = useCallback(() => {
+    if (playingRef.current) cardRef.current?.pause();
+    else cardRef.current?.play();
+  }, []);
+
+  // Stable AudioCard callbacks (read latest track via ref).
   const handlePlay = useCallback(
-    (t: number) => onCardPlay(trackRef.current, t),
+    (t: number) => {
+      playingRef.current = true;
+      onCardPlay(trackRef.current, t);
+    },
     [onCardPlay],
   );
   const handlePause = useCallback(
-    (t: number) => onCardPause(trackRef.current, t),
+    (t: number) => {
+      playingRef.current = false;
+      onCardPause(trackRef.current, t);
+    },
     [onCardPause],
   );
   const handleTimeUpdate = useCallback(
     (t: number) => onCardTimeUpdate(trackRef.current, t),
     [onCardTimeUpdate],
   );
-  const handleEnded = useCallback(
-    () => onCardEnded(trackRef.current),
-    [onCardEnded],
+  const handleEnded = useCallback(() => {
+    playingRef.current = false;
+    onCardEnded(trackRef.current);
+  }, [onCardEnded]);
+
+  const findSimilarLabel = intl.formatMessage(
+    {
+      defaultMessage: "Find tracks similar to {title}",
+      description:
+        "Accessible label for the button that shows tracks similar to this one.",
+    },
+    { title: track.title },
   );
 
   return (
@@ -128,34 +159,52 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
         thumbnailUrl={track.thumbnails.sm}
         ariaLabel={intl.formatMessage(
           {
-            defaultMessage: "Add {title} to design",
+            defaultMessage: "Play preview of {title}",
             description:
-              "Accessible label for the track card; clicking the card adds the track to the design.",
+              "Accessible label for the track card; clicking the card plays a preview.",
           },
           { title: displayTitle },
         )}
         disabled={!canAdd}
-        onClick={handleAddToDesign}
+        onClick={handleCardClick}
         onDragStart={canAdd ? handleDragStart : undefined}
         content={
           tags.length > 0 ? (
-            <Text size="small" tone="tertiary">
+            <Text size="xsmall" tone="tertiary">
               {tags.join(" • ")}
             </Text>
           ) : undefined
         }
-        topEnd={{
-          buttonIcon: () => <SearchIcon />,
-          buttonAriaLabel: intl.formatMessage(
-            {
-              defaultMessage: "Find tracks similar to {title}",
-              description:
-                "Accessible label for the icon button that shows tracks similar to this one.",
-            },
-            { title: track.title },
-          ),
-          buttonOnClick: () => onFindSimilar(track.id),
-        }}
+        topEnd={
+          canAdd
+            ? {
+                buttonIcon: () => <PlusIcon />,
+                buttonAriaLabel: intl.formatMessage(
+                  {
+                    defaultMessage: "Add {title} to design",
+                    description:
+                      "Accessible label for the icon button that adds the track to the design.",
+                  },
+                  { title: displayTitle },
+                ),
+                buttonOnClick: handleAddToDesign,
+              }
+            : undefined
+        }
+        topEndVisibility="on-hover"
+        bottomEnd={
+          <Button
+            variant="tertiary"
+            icon={() => <SearchIcon />}
+            ariaLabel={findSimilarLabel}
+            tooltipLabel={findSimilarLabel}
+            onClick={(e) => {
+              e.stopPropagation?.();
+              onFindSimilar(track.id);
+            }}
+          />
+        }
+        bottomEndVisibility="on-hover"
         onPlay={handlePlay}
         onPause={handlePause}
         onTimeUpdate={handleTimeUpdate}
