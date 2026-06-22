@@ -145,10 +145,20 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
     },
     { title: track.title },
   );
+  const addLabel = intl.formatMessage(
+    {
+      defaultMessage: "Add {title} to design",
+      description:
+        "Accessible label for the button that adds the track to the design.",
+    },
+    { title: displayTitle },
+  );
 
   return (
-    // Wrapper provides the purple "now playing" outline from Canva's mock —
-    // AudioCard itself has no playing-border prop.
+    // Wrapper provides the purple "now playing" outline + hosts the hover
+    // action buttons. AudioCard's own decorator slots only allow corner
+    // placement, so the two side-by-side actions from Canva's mock are a
+    // custom overlay of Kit Buttons on the right edge (shown on hover).
     <div className={`ftu-track${isActive ? " is-playing" : ""}`}>
       <AudioCard
         ref={setCardRef}
@@ -175,41 +185,35 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
             </Text>
           ) : undefined
         }
-        topEnd={
-          canAdd
-            ? {
-                buttonIcon: () => <PlusIcon />,
-                buttonAriaLabel: intl.formatMessage(
-                  {
-                    defaultMessage: "Add {title} to design",
-                    description:
-                      "Accessible label for the icon button that adds the track to the design.",
-                  },
-                  { title: displayTitle },
-                ),
-                buttonOnClick: handleAddToDesign,
-              }
-            : undefined
-        }
-        topEndVisibility="on-hover"
-        bottomEnd={
-          <Button
-            variant="tertiary"
-            icon={() => <SearchIcon />}
-            ariaLabel={findSimilarLabel}
-            tooltipLabel={findSimilarLabel}
-            onClick={(e) => {
-              e.stopPropagation?.();
-              onFindSimilar(track.id);
-            }}
-          />
-        }
-        bottomEndVisibility="on-hover"
         onPlay={handlePlay}
         onPause={handlePause}
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleEnded}
       />
+      <div className="ftu-track-actions">
+        <Button
+          variant="secondary"
+          icon={() => <SearchIcon />}
+          ariaLabel={findSimilarLabel}
+          tooltipLabel={findSimilarLabel}
+          onClick={(e) => {
+            e.stopPropagation?.();
+            onFindSimilar(track.id);
+          }}
+        />
+        {canAdd && (
+          <Button
+            variant="secondary"
+            icon={() => <PlusIcon />}
+            ariaLabel={addLabel}
+            tooltipLabel={addLabel}
+            onClick={(e) => {
+              e.stopPropagation?.();
+              handleAddToDesign();
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }

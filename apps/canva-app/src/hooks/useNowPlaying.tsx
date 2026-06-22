@@ -153,10 +153,12 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     if (!id) return;
     const ref = cardRefs.current.get(id);
     if (!ref) return;
-    // Drive from our own isPlaying — the Kit's isPlaying() stays true while
-    // paused (it means "is the active element"), so it can't be used to
-    // decide resume vs pause. The Kit's play() resumes a paused track.
-    if (stateRef.current.isPlaying) ref.pause();
+    // Use the AudioCard ref's own state (the Kit's source of truth):
+    //   isPaused()  -> active element but paused -> resume via play()
+    //   isPlaying() -> active element and playing -> pause()
+    //   neither     -> not the active element -> play()
+    if (ref.isPaused()) ref.play();
+    else if (ref.isPlaying()) ref.pause();
     else ref.play();
   }, []);
 

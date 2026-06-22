@@ -75,11 +75,38 @@ body,
  * playing-border prop).
  * ------------------------------------------------------------------------- */
 .ftu-track {
+  position: relative;
   border-radius: 8px;
 }
 
 .ftu-track.is-playing {
   box-shadow: 0 0 0 2px var(--ui-kit-color-action-primary-bg);
+}
+
+/* Hover action buttons (find similar + add), overlaid on the right edge of
+ * the card. The container ignores pointer events so clicks between the
+ * buttons fall through to the card (play); the buttons re-enable them. */
+.ftu-track-actions {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+.ftu-track:hover .ftu-track-actions,
+.ftu-track:focus-within .ftu-track-actions {
+  opacity: 1;
+}
+
+.ftu-track-actions > * {
+  pointer-events: auto;
 }
 
 /* ---------------------------------------------------------------------------
@@ -128,6 +155,8 @@ body,
   background: rgba(0, 0, 0, 0.4);
   opacity: 0;
   transition: opacity 150ms ease;
+  /* Let clicks pass through to the cover button beneath. */
+  pointer-events: none;
 }
 
 .ftu-np-cover:hover .ftu-np-cover-overlay,
