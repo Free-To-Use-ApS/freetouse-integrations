@@ -2,11 +2,9 @@ import { useCallback } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
   Button,
-  Link,
   PauseIcon,
   PlayFilledIcon,
   PlusIcon,
-  OpenInNewIcon,
   Text,
 } from "@canva/app-ui-kit";
 import { upload } from "@canva/asset";
@@ -20,6 +18,25 @@ import {
 import { useAttributionModal } from "../hooks/useAttributionModal";
 import { Waveform } from "./Waveform";
 import { formatDuration, getArtistNames, getLicenseUrl } from "../utils/format";
+
+/**
+ * Shopping-bag "get a license" icon. The Kit has no cart/basket icon, so this
+ * is a custom SVG (the "custom component" Canva allows where the Kit has no
+ * counterpart). It paints with currentColor so it matches the Kit Button tone.
+ */
+function LicenseBagIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4z" />
+    </svg>
+  );
+}
 
 export function Player() {
   const intl = useIntl();
@@ -87,7 +104,7 @@ export function Player() {
         <div className="ftu-np-actions">
           <Button
             variant="tertiary"
-            icon={() => <OpenInNewIcon />}
+            icon={() => <LicenseBagIcon />}
             ariaLabel={intl.formatMessage({
               defaultMessage: "Get a license",
               description:
@@ -121,33 +138,28 @@ export function Player() {
       <Waveform data={track.waveform} progress={progress} />
 
       <div className="ftu-np-license">
-        <Text size="xsmall" tone="tertiary">
-          <FormattedMessage
-            defaultMessage="{title} by {artist} is licensed under the <link>Free To Use License</link>"
-            description="License attribution line shown beneath the now-playing waveform. The link opens the Free To Use license page."
-            values={{
-              title: track.title,
-              artist,
-              link: (chunks) => (
-                <Link
-                  href="https://freetouse.com/license"
-                  requestOpenExternalUrl={() =>
-                    requestOpenExternalUrl({
-                      url: "https://freetouse.com/license",
-                    })
-                  }
-                  ariaLabel={intl.formatMessage({
-                    defaultMessage: "Open the Free To Use License",
-                    description:
-                      "Accessible label for the license link in the attribution line.",
-                  })}
-                >
-                  {chunks}
-                </Link>
-              ),
-            }}
-          />
-        </Text>
+        <FormattedMessage
+          defaultMessage="<b>{title} by {artist}</b> is licensed under the <link>Free To Use License</link>"
+          description="License attribution line shown beneath the now-playing waveform. {title} by {artist} and the link text are bold; the link opens the Free To Use license page."
+          values={{
+            title: track.title,
+            artist,
+            b: (chunks) => <strong>{chunks}</strong>,
+            link: (chunks) => (
+              <button
+                type="button"
+                className="ftu-np-license-link"
+                onClick={() =>
+                  requestOpenExternalUrl({
+                    url: "https://freetouse.com/license",
+                  })
+                }
+              >
+                {chunks}
+              </button>
+            ),
+          }}
+        />
       </div>
     </div>
   );

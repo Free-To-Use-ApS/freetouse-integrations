@@ -181,6 +181,25 @@ body,
 
 .ftu-np-license {
   margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--ui-kit-color-content-subtle-fg);
+}
+
+/* Track title + artist are bold (the <strong> spans). */
+.ftu-np-license strong {
+  font-weight: 700;
+}
+
+/* "Free To Use License" link: bold, same color as the text (not tinted),
+ * underlined only to signal it's clickable. */
+.ftu-np-license-link {
+  all: unset;
+  font: inherit;
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 /* ---------------------------------------------------------------------------

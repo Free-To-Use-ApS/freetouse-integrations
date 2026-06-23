@@ -151,7 +151,7 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
       description:
         "Accessible label for the button that adds the track to the design.",
     },
-    { title: displayTitle },
+    { title: track.title },
   );
 
   return (
@@ -173,7 +173,7 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
             description:
               "Accessible label for the track card; clicking the card plays a preview.",
           },
-          { title: displayTitle },
+          { title: track.title },
         )}
         disabled={!canAdd}
         onClick={handleCardClick}
@@ -181,7 +181,7 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
         content={
           tags.length > 0 ? (
             <Text size="xsmall" tone="tertiary">
-              {tags.join(" • ")}
+              {tags.join(", ")}
             </Text>
           ) : undefined
         }
