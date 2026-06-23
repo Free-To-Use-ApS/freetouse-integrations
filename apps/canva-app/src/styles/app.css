@@ -76,6 +76,8 @@ body,
  * ------------------------------------------------------------------------- */
 .ftu-track {
   position: relative;
+  display: flex;
+  align-items: center;
   border-radius: 8px;
 }
 
@@ -83,30 +85,28 @@ body,
   box-shadow: 0 0 0 2px var(--ui-kit-color-action-primary-bg);
 }
 
-/* Hover action buttons (find similar + add), overlaid on the right edge of
- * the card. The container ignores pointer events so clicks between the
- * buttons fall through to the card (play); the buttons re-enable them. */
+/* The AudioCard flexes and shrinks; min-width: 0 lets its title/artist
+ * truncate with an ellipsis instead of running under the action buttons. */
+.ftu-track-card {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Action buttons (find similar + add) sit beside the card and ALWAYS reserve
+ * their space (so the card text truncates leaving room and there's no layout
+ * shift). They're only revealed on hover / keyboard focus. */
 .ftu-track-actions {
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  z-index: 4;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 150ms ease;
+  padding-left: 6px;
+  visibility: hidden;
 }
 
 .ftu-track:hover .ftu-track-actions,
 .ftu-track:focus-within .ftu-track-actions {
-  opacity: 1;
-}
-
-.ftu-track-actions > * {
-  pointer-events: auto;
+  visibility: visible;
 }
 
 /* ---------------------------------------------------------------------------

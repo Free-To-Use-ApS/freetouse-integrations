@@ -155,11 +155,13 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
   );
 
   return (
-    // Wrapper provides the purple "now playing" outline + hosts the hover
-    // action buttons. AudioCard's own decorator slots only allow corner
-    // placement, so the two side-by-side actions from Canva's mock are a
-    // custom overlay of Kit Buttons on the right edge (shown on hover).
+    // Flex row: the AudioCard flexes (and truncates its title/artist with an
+    // ellipsis) while the action buttons reserve fixed space on the right, so
+    // long titles/artists never run underneath the buttons. The buttons are
+    // only revealed on hover/focus but their space is always reserved (no
+    // layout shift). The wrapper also carries the "now playing" outline.
     <div className={`ftu-track${isActive ? " is-playing" : ""}`}>
+      <div className="ftu-track-card">
       <AudioCard
         ref={setCardRef}
         title={track.title}
@@ -180,7 +182,7 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
         onDragStart={canAdd ? handleDragStart : undefined}
         content={
           tags.length > 0 ? (
-            <Text size="xsmall" tone="tertiary">
+            <Text size="xsmall" tone="tertiary" lineClamp={1}>
               {tags.join(", ")}
             </Text>
           ) : undefined
@@ -190,6 +192,7 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleEnded}
       />
+      </div>
       <div className="ftu-track-actions">
         <Button
           variant="secondary"
