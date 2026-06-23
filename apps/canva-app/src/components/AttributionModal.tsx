@@ -78,7 +78,7 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
           description: "Accessible label for the attribution dialog.",
         })}
       >
-        <Rows spacing="1.5u">
+        <Rows spacing="2u">
           <div className="ftu-modal-header">
             <Title size="small">
               <FormattedMessage
@@ -99,16 +99,20 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
 
           <Text size="small" tone="secondary">
             <FormattedMessage
-              defaultMessage="{title} by {artist} is free to use in non-commercial content as long as you provide attribution."
-              description="Body text of the attribution modal explaining the user's licensing obligation."
-              values={{ title: track.title, artist }}
+              defaultMessage="<b>{title} by {artist}</b> is free to use in non-commercial content as long as you provide attribution."
+              description="Body text of the attribution modal explaining the user's licensing obligation. {title} by {artist} is bold."
+              values={{
+                title: track.title,
+                artist,
+                b: (chunks) => <strong>{chunks}</strong>,
+              }}
             />
           </Text>
 
           <div className="ftu-attribution-box">
             <div className="ftu-attribution-lines">
               {lines.map((line) => (
-                <Text key={line} size="small">
+                <Text key={line} size="xsmall">
                   {line}
                 </Text>
               ))}
