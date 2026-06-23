@@ -81,6 +81,15 @@ body,
   border-radius: 8px;
 }
 
+/* Extend the AudioCard's hover background across the whole row (incl. the
+ * reserved action-button area on the right) so the highlight reaches the
+ * edge. Uses the same token the Kit AudioCard transitions to on hover, so
+ * there's no seam between the card and the buttons. */
+.ftu-track:hover,
+.ftu-track:focus-within {
+  background: var(--ui-kit-color-action-tertiary-bg-hovered);
+}
+
 .ftu-track.is-playing {
   box-shadow: 0 0 0 2px var(--ui-kit-color-action-primary-bg);
 }

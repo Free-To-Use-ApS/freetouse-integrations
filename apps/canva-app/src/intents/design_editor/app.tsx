@@ -260,7 +260,7 @@ export function App() {
   return (
     <div className="app">
       <div className="app-top">
-        {relatedToId ? (
+        {relatedToId && (
           <SurfaceHeader
             title={intl.formatMessage({
               defaultMessage: "Similar music",
@@ -275,14 +275,6 @@ export function App() {
               }),
               onClick: handleBack,
             }}
-          />
-        ) : (
-          <SurfaceHeader
-            title={intl.formatMessage({
-              defaultMessage: "Music",
-              description: "Header title for the main music browsing view.",
-            })}
-            divider={false}
           />
         )}
 

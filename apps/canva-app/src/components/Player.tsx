@@ -22,25 +22,20 @@ import { formatDuration, getArtistNames, getLicenseUrl } from "../utils/format";
 /**
  * Shopping-bag "get a license" icon. The Kit has no cart/basket icon, so this
  * is a custom SVG (the "custom component" Canva allows where the Kit has no
- * counterpart). Outline style + 24px + currentColor so it matches the visual
- * weight, size, and color of the Kit icons (medium = 24px) in the same Button.
+ * counterpart). This is the outline version of the original bag shape, with
+ * currentColor so it matches the color and visual weight of the Kit plus icon
+ * in the same Button.
  */
 function LicenseBagIcon() {
   return (
     <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      width="20"
+      height="20"
+      viewBox="0 0 16 16"
+      fill="currentColor"
       aria-hidden="true"
     >
-      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-      <path d="M3 6h18" />
-      <path d="M16 10a4 4 0 0 1-8 0" />
+      <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-1v-.5a1.5 1.5 0 0 0-3 0V4h-1v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" />
     </svg>
   );
 }
