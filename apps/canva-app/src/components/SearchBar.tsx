@@ -31,7 +31,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
     <SearchInputMenu
       value={value}
       placeholder={intl.formatMessage({
-        defaultMessage: "Search royalty-free music...",
+        defaultMessage: "Search royalty-free music",
         description:
           "Placeholder text in the search input at the top of the music app.",
       })}

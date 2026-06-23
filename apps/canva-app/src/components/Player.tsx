@@ -22,18 +22,43 @@ import { formatDuration, getArtistNames, getLicenseUrl } from "../utils/format";
 /**
  * Shopping-bag "get a license" icon. The Kit has no cart/basket icon, so this
  * is a custom SVG (the "custom component" Canva allows where the Kit has no
- * counterpart). It paints with currentColor so it matches the Kit Button tone.
+ * counterpart). Outline style + 24px + currentColor so it matches the visual
+ * weight, size, and color of the Kit icons (medium = 24px) in the same Button.
  */
 function LicenseBagIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  );
+}
+
+/** Small "opens in a new tab" indicator (box with an arrow leaving the top
+ * right), sized to sit inline with the tiny license attribution text. */
+function ExternalLinkIcon() {
+  return (
+    <svg
+      width="11"
+      height="11"
       viewBox="0 0 16 16"
       fill="currentColor"
       aria-hidden="true"
+      className="ftu-np-license-ext"
     >
-      <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4z" />
+      <path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z" />
+      <path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z" />
     </svg>
   );
 }
@@ -156,6 +181,7 @@ export function Player() {
                 }
               >
                 {chunks}
+                <ExternalLinkIcon />
               </button>
             ),
           }}

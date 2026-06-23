@@ -137,22 +137,16 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
     onCardEnded(trackRef.current);
   }, [onCardEnded]);
 
-  const findSimilarLabel = intl.formatMessage(
-    {
-      defaultMessage: "Find tracks similar to {title}",
-      description:
-        "Accessible label for the button that shows tracks similar to this one.",
-    },
-    { title: track.title },
-  );
-  const addLabel = intl.formatMessage(
-    {
-      defaultMessage: "Add {title} to design",
-      description:
-        "Accessible label for the button that adds the track to the design.",
-    },
-    { title: track.title },
-  );
+  const findSimilarLabel = intl.formatMessage({
+    defaultMessage: "Find similar tracks",
+    description:
+      "Tooltip / accessible label for the button that shows tracks similar to this one.",
+  });
+  const addLabel = intl.formatMessage({
+    defaultMessage: "Add to design",
+    description:
+      "Tooltip / accessible label for the button that adds the track to the design.",
+  });
 
   return (
     // Flex row: the AudioCard flexes (and truncates its title/artist with an
