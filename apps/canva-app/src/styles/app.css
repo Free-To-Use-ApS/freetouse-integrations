@@ -109,9 +109,16 @@ body,
   visibility: hidden;
 }
 
+/* Reveal the buttons on hover OR keyboard focus... */
 .ftu-track:hover .ftu-track-actions,
 .ftu-track:focus-within .ftu-track-actions {
   visibility: visible;
+}
+
+/* ...but only paint the grey background on real hover, when the AudioCard
+ * itself also turns grey — so a focused/playing (but not hovered) card never
+ * shows a lone grey strip behind its buttons. */
+.ftu-track:hover .ftu-track-actions {
   background: var(--ui-kit-color-action-tertiary-bg-hovered);
 }
 
@@ -280,7 +287,7 @@ body,
 .ftu-modal {
   width: 100%;
   max-width: 380px;
-  padding: 24px;
+  padding: 18px;
   border-radius: 16px;
   background: var(--ui-kit-color-control-bg);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
@@ -296,8 +303,8 @@ body,
 .ftu-attribution-box {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 14px;
   border: 1px solid var(--ui-kit-color-control-border);
   border-radius: 10px;
   background: var(--ui-kit-color-control-bg);
@@ -310,4 +317,22 @@ body,
   flex-direction: column;
   gap: 4px;
   word-break: break-word;
+}
+
+/* Kit icon buttons have internal padding that leaves the glyph inset from the
+ * container edge. These wrappers pull the close (X) and copy buttons flush to
+ * the right edge (aligned with the attribution box) and trim the extra space
+ * they take up vertically. */
+.ftu-icon-btn-flush {
+  display: inline-flex;
+  margin-right: -8px;
+}
+
+.ftu-modal-header .ftu-icon-btn-flush {
+  margin-top: -6px;
+  margin-bottom: -6px;
+}
+
+.ftu-attribution-copy {
+  flex-shrink: 0;
 }

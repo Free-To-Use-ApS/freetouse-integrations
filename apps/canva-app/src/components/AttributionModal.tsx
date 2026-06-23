@@ -78,7 +78,7 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
           description: "Accessible label for the attribution dialog.",
         })}
       >
-        <Rows spacing="2u">
+        <Rows spacing="1.5u">
           <div className="ftu-modal-header">
             <Title size="small">
               <FormattedMessage
@@ -86,15 +86,17 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
                 description="Title of the modal shown after a track is added, reminding the user to credit the music."
               />
             </Title>
-            <Button
-              variant="tertiary"
-              icon={() => <XIcon />}
-              ariaLabel={intl.formatMessage({
-                defaultMessage: "Close",
-                description: "Accessible label for the modal's close button.",
-              })}
-              onClick={onClose}
-            />
+            <span className="ftu-icon-btn-flush">
+              <Button
+                variant="tertiary"
+                icon={() => <XIcon />}
+                ariaLabel={intl.formatMessage({
+                  defaultMessage: "Close",
+                  description: "Accessible label for the modal's close button.",
+                })}
+                onClick={onClose}
+              />
+            </span>
           </div>
 
           <Text size="small" tone="secondary">
@@ -117,7 +119,8 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
                 </Text>
               ))}
             </div>
-            <Button
+            <span className="ftu-icon-btn-flush ftu-attribution-copy">
+              <Button
               variant="tertiary"
               icon={() => (copied ? <CheckIcon /> : <CopyIcon />)}
               ariaLabel={
@@ -145,7 +148,8 @@ export function AttributionModal({ track, onClose }: AttributionModalProps) {
                     })
               }
               onClick={handleCopy}
-            />
+              />
+            </span>
           </div>
         </Rows>
       </div>
