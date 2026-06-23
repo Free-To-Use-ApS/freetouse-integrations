@@ -81,6 +81,24 @@ body,
   border-radius: 8px;
 }
 
+/* ONE hover surface for the whole row: hovering anywhere — the card OR the
+ * action buttons — highlights the entire row uniformly, with rounded corners
+ * on both ends and no seam. (See the AudioCard hover-bg override below, which
+ * stops the card painting its own competing/rounded hover background.) */
+.ftu-track:hover {
+  background: var(--ui-kit-color-action-tertiary-bg-hovered);
+}
+
+/* The Kit AudioCard paints its OWN hover background, but only over the card
+ * (not the buttons) and rounded on all corners — which produced a two-tone,
+ * seamed highlight. The card's base background is "none" (transparent), so we
+ * neutralise just its hover rule and let .ftu-track:hover above provide the
+ * single uniform highlight. `mc99Nw` (bgTransitionOnHover) + `kFRwuQ`
+ * (backgroundNone) are App UI Kit 5.9.0 utility classes. */
+.ftu-track .mc99Nw:hover.kFRwuQ {
+  background-color: transparent !important;
+}
+
 .ftu-track.is-playing {
   box-shadow: 0 0 0 2px var(--ui-kit-color-action-primary-bg);
 }
@@ -94,9 +112,8 @@ body,
 
 /* Action buttons (find similar + add) sit beside the card and ALWAYS reserve
  * their space (so the card text truncates leaving room and there's no layout
- * shift). They're only revealed on hover / keyboard focus. On hover they get
- * the SAME single-layer hover background the Kit AudioCard uses, so the row
- * highlight is one uniform colour edge-to-edge (no two-tone seam). */
+ * shift). They're only revealed on hover / keyboard focus; the row-level
+ * .ftu-track:hover provides their background, so no separate bg is needed. */
 .ftu-track-actions {
   flex-shrink: 0;
   align-self: stretch;
@@ -105,21 +122,12 @@ body,
   gap: 6px;
   padding-left: 6px;
   padding-right: 10px;
-  border-radius: 0 8px 8px 0;
   visibility: hidden;
 }
 
-/* Reveal the buttons on hover OR keyboard focus... */
 .ftu-track:hover .ftu-track-actions,
 .ftu-track:focus-within .ftu-track-actions {
   visibility: visible;
-}
-
-/* ...but only paint the grey background on real hover, when the AudioCard
- * itself also turns grey — so a focused/playing (but not hovered) card never
- * shows a lone grey strip behind its buttons. */
-.ftu-track:hover .ftu-track-actions {
-  background: var(--ui-kit-color-action-tertiary-bg-hovered);
 }
 
 /* ---------------------------------------------------------------------------
