@@ -95,11 +95,18 @@ interface Track {
   duration: number;                       // seconds
   files: { mp3: string };                 // public CDN URL
   thumbnails: { sm; md; lg; xl: string };
-  waveform: number[];                     // ~300 ints, 0–100
+  waveform: number[];                     // ~300 ints, 0–100; also loudness source
   artists: [number, { id; name: string }][];
   tags_categories: [number, string | { name: string }][];
 }
 ```
+
+**Loudness normalization:** the API has no LUFS/peak field, so loud tracks blast
+quiet ones while browsing. `waveformToGain(track.waveform)` (from `@freetouse/api`)
+returns an attenuate-only multiplier (0..1) from the waveform mean. Apply it as
+the Web Audio fade-in target (extensions) or `audio.volume` (Canva preview, MCP
+widget); the MCP server also ships it as `track.gain`. Never boosts (clips);
+returns 1 with no waveform. See PLAYBOOK §4.
 
 ## Top 10 gotchas (read before coding!)
 

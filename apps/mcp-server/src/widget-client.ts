@@ -19,6 +19,8 @@ interface UiTrack {
   tags?: string[];
   genre?: string | null;
   description?: string;
+  /** Attenuate-only loudness multiplier (0..1) for consistent playback volume */
+  gain?: number;
 }
 
 const FALLBACK: { query?: string; tracks: UiTrack[] } = {
@@ -138,6 +140,7 @@ function render(data: { query?: string; tracks?: UiTrack[] } | null | undefined)
       if (activeBtn && activeBtn !== btn) activeBtn.textContent = "▶";
       document.querySelectorAll(".row.active").forEach((r) => r.classList.remove("active"));
       if (a.getAttribute("src") !== t.mp3) a.src = t.mp3;
+      a.volume = typeof t.gain === "number" ? t.gain : 1;
       row.classList.add("active");
       activeBtn = btn;
       btn.textContent = "⏸"; // ⏸

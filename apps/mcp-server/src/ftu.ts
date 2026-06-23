@@ -6,11 +6,13 @@
 // by how well each track's tags / categories / genre / title match the query.
 // This is robust to phrasing, instant per search, and easy on the API.
 //
-// We only ever expose a trimmed shape (no waveform / stats) plus a short,
-// honest description synthesized from real metadata.
+// We only ever expose a trimmed shape (no raw waveform / stats) plus a short,
+// honest description synthesized from real metadata and a precomputed loudness
+// `gain` (derived from the waveform) so downstream players can level volume.
 import {
   getCategories,
   getTracks,
+  waveformToGain,
   type Track,
 } from "@freetouse/api";
 
@@ -29,6 +31,12 @@ export interface UiTrack {
   genre: string | null;
   /** One-sentence blurb synthesized from genre + categories + tags */
   description: string;
+  /**
+   * Attenuate-only loudness multiplier (0..1) derived from the track's waveform,
+   * so a downstream player can keep volume consistent across tracks. Assign
+   * directly to an HTMLAudioElement.volume or a Web Audio GainNode target.
+   */
+  gain: number;
 }
 
 interface IndexEntry extends UiTrack {
@@ -118,6 +126,7 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     tags: tags.slice(0, 5),
     genre: t.genre,
     description: describe(t.genre, cats, tags, types),
+    gain: waveformToGain(t.waveform),
     downloads: t.downloads ?? 0,
     tagcat: [...tags, ...cats].join(" ").toLowerCase(),
     text: [t.title, artist, t.genre ?? ""].join(" ").toLowerCase(),

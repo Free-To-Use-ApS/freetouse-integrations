@@ -1,5 +1,5 @@
 import type { Message, PlayerState } from "../shared/messages.js";
-import type { Track } from "@freetouse/api";
+import { waveformToGain, type Track } from "@freetouse/api";
 
 const audioCtx = new AudioContext();
 const audio = new Audio();
@@ -8,6 +8,10 @@ const gainNode = audioCtx.createGain();
 sourceNode.connect(gainNode).connect(audioCtx.destination);
 
 let currentTrack: Track | null = null;
+// Per-track loudness-normalization multiplier (0..1). Recomputed on each PLAY
+// and used as the fade-in target so loud tracks settle at a lower steady-state
+// volume than quiet ones. See `waveformToGain` in @freetouse/api.
+let trackGain = 1;
 
 function updateMediaSession(track: Track) {
   const artists = track.artists.map(([, a]) => a.name).join(", ");
@@ -36,7 +40,7 @@ function fadeOut(durationMs = 60): Promise<void> {
 function fadeIn() {
   const now = audioCtx.currentTime;
   gainNode.gain.setValueAtTime(0, now);
-  gainNode.gain.linearRampToValueAtTime(1, now + 0.06);
+  gainNode.gain.linearRampToValueAtTime(trackGain, now + 0.06);
 }
 
 /** Safely call audio.play() and swallow AbortError from interrupted playback */
@@ -71,6 +75,7 @@ chrome.runtime.onMessage.addListener((msg: Message) => {
       fadeOut().then(() => {
         audio.pause();
         currentTrack = msg.track;
+        trackGain = waveformToGain(msg.track.waveform);
         audio.src = msg.track.files.mp3;
         updateMediaSession(msg.track);
         fadeIn();

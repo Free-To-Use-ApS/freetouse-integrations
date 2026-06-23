@@ -194,6 +194,42 @@ audio.play().catch(() => {});  // Required
 
 The Player bar's play/pause button should call `pause()` / `resume()` directly on the audio element via the provider — don't try to manage a separate "playing" state in the Player component.
 
+### Loudness normalization (per-track volume leveling)
+
+Tracks vary in loudness, so browsing from a loud track to a quiet one (or vice
+versa) makes users constantly reach for the volume. Every player normalizes this
+the same way, via one shared helper:
+
+```ts
+import { waveformToGain } from "@freetouse/api";
+
+const gain = waveformToGain(track.waveform); // attenuate-only multiplier, 0..1
+```
+
+Why the waveform: the API exposes **no** true loudness value (no LUFS/RMS/peak).
+The only signal is `track.waveform` (300 ints 0–100), normalized to each track's
+own peak — so a loud/compressed track sits high across the envelope (high mean)
+and a quiet/dynamic one sits lower. The **mean** is therefore a good proxy for
+perceived loudness, and `waveformToGain` turns the loud tracks *down* toward a
+reference level. It is **attenuate-only** (never returns > 1 — boosting through a
+`MediaElementSource` clips), and returns `1` when there's no usable waveform, so
+you can apply it unconditionally. Defaults are tuned from the real catalog and
+mirror the normalization on freetouse.com; tune via the options arg if needed.
+
+Apply it wherever the player sets volume — **the value is a linear multiplier**,
+so it drops straight into either kind of playback path:
+
+- **Web Audio (`GainNode`)** — make the fade-in ramp target `gain` instead of `1`
+  (recompute `gain` per track on PLAY). The 60ms fade still works; the
+  steady-state level just becomes the normalized one. (Chrome/Edge extensions.)
+- **Plain `HTMLAudioElement`** — set `audio.volume = gain` when you assign a new
+  `src`. (Canva preview, MCP widget.)
+- **No player of your own (data only)** — expose `gain` in your payload so a
+  downstream player can apply it. (MCP server adds it to each `UiTrack`.)
+
+Caveat: this normalizes **playback only**. On Canva, the asset added to the
+design timeline is the raw file — preview is leveled, the exported asset is not.
+
 ---
 
 ## 5. Waveform scrubber
@@ -665,7 +701,7 @@ Always render below the waveform:
 
 - **Manifest v3** with permissions: `offscreen`, `downloads`, `downloads.shelf`, `storage`
 - **Offscreen document** for audio playback (Chrome only allows one — guard `createDocument()` with a shared promise, catch "already exists")
-- **Web Audio API** with a `GainNode` for fade-in/out (60ms ramp) — eliminates audio pop on track switch
+- **Web Audio API** with a `GainNode` for fade-in/out (60ms ramp) — eliminates audio pop on track switch. The same node carries the per-track **loudness-normalization** gain: fade-in ramps to `waveformToGain(track.waveform)` instead of `1` (see §4). Applies to the Edge extension too.
 - **chrome.downloads.setShelfEnabled(false)** before download — prevents Chrome's download bar from covering the popup
 - **Media Session API** — set `navigator.mediaSession.metadata` so Chrome's media controls show track info
 - **Storage**: `chrome.storage.session` for UI state (clears on browser close)
