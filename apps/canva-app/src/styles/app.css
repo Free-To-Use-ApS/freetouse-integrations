@@ -172,8 +172,13 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.4);
+  /* Match the Kit AudioCard's play/pause glyph: the card uses a "basic"
+   * button (background: none) whose icon inherits the theme content
+   * foreground — dark (#0F1015) in light mode, near-white in dark mode —
+   * sitting directly over the cover art with no scrim. We mirror that:
+   * theme-aware glyph colour, transparent backdrop. */
+  color: var(--ui-kit-color-content-fg);
+  background: transparent;
   opacity: 0;
   transition: opacity 150ms ease;
   /* Let clicks pass through to the cover button beneath. */

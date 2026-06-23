@@ -20,9 +20,9 @@ function SkeletonRow() {
   return (
     <Columns spacing="1u" alignY="center">
       <Column width="content">
-        <Box className="ftu-cover-skeleton">
+        <div className="ftu-cover-skeleton">
           <Placeholder shape="square" />
-        </Box>
+        </div>
       </Column>
       <Column width="fluid">
         <Rows spacing="0.5u">
