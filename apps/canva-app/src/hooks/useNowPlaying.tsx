@@ -46,9 +46,24 @@ interface NowPlayingControls {
   toggleCurrent: () => void;
 }
 
+interface NowPlayingTrackState {
+  track: Track | null;
+  isPlaying: boolean;
+}
+
+interface NowPlayingProgressState {
+  currentTime: number;
+  duration: number;
+}
+
 const ControlsContext = createContext<NowPlayingControls | null>(null);
 const ActiveTrackIdContext = createContext<string | null>(null);
-const StateContext = createContext<NowPlayingState | null>(null);
+// Split low-frequency (track / play state) from high-frequency (progress)
+// state so the Player shell — and its buttons — only re-render when the track
+// or play/pause state changes, not on every timeupdate tick (which would make
+// the Kit Buttons drop clicks mid-press).
+const TrackContext = createContext<NowPlayingTrackState | null>(null);
+const ProgressContext = createContext<NowPlayingProgressState | null>(null);
 
 const INITIAL: NowPlayingState = {
   track: null,
@@ -253,10 +268,25 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
 
   const activeTrackId = state.track?.id ?? null;
 
+  // Low-frequency: changes only when the track or play/pause state changes.
+  const trackValue = useMemo<NowPlayingTrackState>(
+    () => ({ track: state.track, isPlaying: state.isPlaying }),
+    [state.track, state.isPlaying],
+  );
+  // High-frequency: changes on every timeupdate tick.
+  const progressValue = useMemo<NowPlayingProgressState>(
+    () => ({ currentTime: state.currentTime, duration: state.duration }),
+    [state.currentTime, state.duration],
+  );
+
   return (
     <ControlsContext.Provider value={controls}>
       <ActiveTrackIdContext.Provider value={activeTrackId}>
-        <StateContext.Provider value={state}>{children}</StateContext.Provider>
+        <TrackContext.Provider value={trackValue}>
+          <ProgressContext.Provider value={progressValue}>
+            {children}
+          </ProgressContext.Provider>
+        </TrackContext.Provider>
       </ActiveTrackIdContext.Provider>
     </ControlsContext.Provider>
   );
@@ -276,11 +306,24 @@ export function useActiveTrackId(): string | null {
   return useContext(ActiveTrackIdContext);
 }
 
-/** High-frequency live state — only the bottom Player should consume this. */
-export function useNowPlayingState(): NowPlayingState {
-  const ctx = useContext(StateContext);
+/** Low-frequency: the playing track + play/pause state (changes only on
+ * track switch or play/pause). Safe for the Player shell + its buttons. */
+export function useNowPlayingTrack(): NowPlayingTrackState {
+  const ctx = useContext(TrackContext);
   if (!ctx) {
-    throw new Error("useNowPlayingState must be used inside NowPlayingProvider");
+    throw new Error("useNowPlayingTrack must be used inside NowPlayingProvider");
+  }
+  return ctx;
+}
+
+/** High-frequency live progress — only the time readout + waveform should
+ * consume this, so the rest of the Player doesn't re-render every tick. */
+export function useNowPlayingProgress(): NowPlayingProgressState {
+  const ctx = useContext(ProgressContext);
+  if (!ctx) {
+    throw new Error(
+      "useNowPlayingProgress must be used inside NowPlayingProvider",
+    );
   }
   return ctx;
 }

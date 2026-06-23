@@ -13,7 +13,8 @@ import { useFeatureSupport } from "@canva/app-hooks";
 import { requestOpenExternalUrl } from "@canva/platform";
 import {
   useNowPlayingControls,
-  useNowPlayingState,
+  useNowPlayingProgress,
+  useNowPlayingTrack,
 } from "../hooks/useNowPlaying";
 import { useAttributionModal } from "../hooks/useAttributionModal";
 import { Waveform } from "./Waveform";
@@ -58,12 +59,46 @@ function ExternalLinkIcon() {
   );
 }
 
+/** Live "currentTime / total • artist" readout. Isolated so only this small
+ * node re-renders on each timeupdate tick — not the whole Player (which would
+ * make the action buttons drop clicks mid-press). */
+function NowPlayingTime({
+  artist,
+  totalFallback,
+}: {
+  artist: string;
+  totalFallback: number;
+}) {
+  const { currentTime, duration } = useNowPlayingProgress();
+  const total = duration > 0 ? duration : totalFallback;
+  return (
+    <Text size="xsmall" tone="tertiary" lineClamp={1}>
+      {formatDuration(currentTime)} / {formatDuration(total)} • {artist}
+    </Text>
+  );
+}
+
+/** Waveform fed by the high-frequency progress context, isolated for the same
+ * reason as NowPlayingTime. */
+function NowPlayingWaveform({
+  data,
+  totalFallback,
+}: {
+  data: number[];
+  totalFallback: number;
+}) {
+  const { currentTime, duration } = useNowPlayingProgress();
+  const total = duration > 0 ? duration : totalFallback;
+  const progress = total > 0 ? currentTime / total : 0;
+  return <Waveform data={data} progress={progress} />;
+}
+
 export function Player() {
   const intl = useIntl();
   const isSupported = useFeatureSupport();
   const canAdd = isSupported(addAudioTrack);
   const { toggleCurrent } = useNowPlayingControls();
-  const { track, isPlaying, currentTime, duration } = useNowPlayingState();
+  const { track, isPlaying } = useNowPlayingTrack();
   const { showAttribution } = useAttributionModal();
 
   const handleAddToDesign = useCallback(async () => {
@@ -81,11 +116,13 @@ export function Player() {
     showAttribution(track);
   }, [track, canAdd, showAttribution]);
 
+  const handleGetLicense = useCallback(() => {
+    if (track) requestOpenExternalUrl({ url: getLicenseUrl(track) });
+  }, [track]);
+
   if (!track) return null;
 
   const artist = getArtistNames(track);
-  const total = duration > 0 ? duration : track.duration;
-  const progress = total > 0 ? currentTime / total : 0;
 
   return (
     <div className="ftu-np">
@@ -116,9 +153,7 @@ export function Player() {
           <Text size="small" lineClamp={1}>
             {track.title}
           </Text>
-          <Text size="xsmall" tone="tertiary" lineClamp={1}>
-            {formatDuration(currentTime)} / {formatDuration(total)} • {artist}
-          </Text>
+          <NowPlayingTime artist={artist} totalFallback={track.duration} />
         </div>
 
         <div className="ftu-np-actions">
@@ -134,7 +169,7 @@ export function Player() {
               defaultMessage: "Get a license",
               description: "Tooltip for the license button.",
             })}
-            onClick={() => requestOpenExternalUrl({ url: getLicenseUrl(track) })}
+            onClick={handleGetLicense}
           />
           {canAdd && (
             <Button
@@ -155,7 +190,7 @@ export function Player() {
         </div>
       </div>
 
-      <Waveform data={track.waveform} progress={progress} />
+      <NowPlayingWaveform data={track.waveform} totalFallback={track.duration} />
 
       <div className="ftu-np-license">
         <FormattedMessage
