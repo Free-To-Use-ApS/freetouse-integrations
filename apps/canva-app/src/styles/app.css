@@ -81,15 +81,6 @@ body,
   border-radius: 8px;
 }
 
-/* Extend the AudioCard's hover background across the whole row (incl. the
- * reserved action-button area on the right) so the highlight reaches the
- * edge. Uses the same token the Kit AudioCard transitions to on hover, so
- * there's no seam between the card and the buttons. */
-.ftu-track:hover,
-.ftu-track:focus-within {
-  background: var(--ui-kit-color-action-tertiary-bg-hovered);
-}
-
 .ftu-track.is-playing {
   box-shadow: 0 0 0 2px var(--ui-kit-color-action-primary-bg);
 }
@@ -103,19 +94,25 @@ body,
 
 /* Action buttons (find similar + add) sit beside the card and ALWAYS reserve
  * their space (so the card text truncates leaving room and there's no layout
- * shift). They're only revealed on hover / keyboard focus. */
+ * shift). They're only revealed on hover / keyboard focus. On hover they get
+ * the SAME single-layer hover background the Kit AudioCard uses, so the row
+ * highlight is one uniform colour edge-to-edge (no two-tone seam). */
 .ftu-track-actions {
   flex-shrink: 0;
+  align-self: stretch;
   display: flex;
   align-items: center;
   gap: 6px;
   padding-left: 6px;
+  padding-right: 10px;
+  border-radius: 0 8px 8px 0;
   visibility: hidden;
 }
 
 .ftu-track:hover .ftu-track-actions,
 .ftu-track:focus-within .ftu-track-actions {
   visibility: visible;
+  background: var(--ui-kit-color-action-tertiary-bg-hovered);
 }
 
 /* ---------------------------------------------------------------------------
