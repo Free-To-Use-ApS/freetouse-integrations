@@ -223,12 +223,20 @@ so it drops straight into either kind of playback path:
   (recompute `gain` per track on PLAY). The 60ms fade still works; the
   steady-state level just becomes the normalized one. (Chrome/Edge extensions.)
 - **Plain `HTMLAudioElement`** — set `audio.volume = gain` when you assign a new
-  `src`. (Canva preview, MCP widget.)
+  `src`. (MCP widget.)
 - **No player of your own (data only)** — expose `gain` in your payload so a
   downstream player can apply it. (MCP server adds it to each `UiTrack`.)
 
-Caveat: this normalizes **playback only**. On Canva, the asset added to the
-design timeline is the raw file — preview is leveled, the exported asset is not.
+Known gap — Canva: the Canva app plays previews through the UI Kit's
+`AudioCard`, which encapsulates its own audio element and exposes **no volume
+control** (no `volume` prop, no ref method, no access to the element). So Canva
+preview cannot be normalized without either a fragile DOM hack into Kit
+internals or dropping `AudioCard` for a custom player — neither is worth it.
+Canva preview is intentionally left un-normalized. If a future Kit version adds
+a volume prop, wire `waveformToGain(track.waveform)` into it.
+
+Caveat: normalization only ever affects **playback**, never the downloaded /
+added asset (that's the raw file).
 
 ---
 

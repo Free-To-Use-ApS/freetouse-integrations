@@ -104,9 +104,10 @@ interface Track {
 **Loudness normalization:** the API has no LUFS/peak field, so loud tracks blast
 quiet ones while browsing. `waveformToGain(track.waveform)` (from `@freetouse/api`)
 returns an attenuate-only multiplier (0..1) from the waveform mean. Apply it as
-the Web Audio fade-in target (extensions) or `audio.volume` (Canva preview, MCP
-widget); the MCP server also ships it as `track.gain`. Never boosts (clips);
-returns 1 with no waveform. See PLAYBOOK §4.
+the Web Audio fade-in target (extensions) or `audio.volume` (MCP widget); the
+MCP server also ships it as `track.gain`. Canva is a known gap — its UI Kit
+`AudioCard` exposes no volume control, so its preview can't be normalized.
+Never boosts (clips); returns 1 with no waveform. See PLAYBOOK §4.
 
 ## Top 10 gotchas (read before coding!)
 
