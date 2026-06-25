@@ -7,9 +7,8 @@ services:
   - name: ftu-mcp-server
     type: web
     runtime: node
-    # Free spins down when idle (cold start ~30-60s on the first request after
-    # inactivity, plus catalog warm-up). Switch to "starter" to stay always-on.
-    plan: free
+    # Starter keeps the instance always-on — no idle spin-down or cold starts.
+    plan: starter
     region: oregon
     branch: main
     autoDeployTrigger: commit

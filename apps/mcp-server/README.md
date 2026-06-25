@@ -74,9 +74,9 @@ This repo ships a `render.yaml` blueprint at the root. To deploy:
    configure.
 4. Add that `…/mcp` URL as a custom connector in Claude / ChatGPT.
 
-The `free` plan spins down when idle (the first request after inactivity is slow
-while it wakes and warms the catalog). Set `plan: starter` in `render.yaml` for
-an always-on service.
+Runs on Render's `starter` plan (always-on — no idle spin-down or cold starts).
+Drop it to `plan: free` in `render.yaml` to save cost during development, at the
+cost of a slow first request after inactivity.
 
 ### Any Node host (manual)
 
