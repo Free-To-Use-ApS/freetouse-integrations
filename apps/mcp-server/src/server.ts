@@ -147,8 +147,13 @@ app.use("/mcp", mcpLimiter);
 // This provider approves everyone (no login) but issues signed-JWT tokens, so
 // it keeps no session state and survives restarts. Set AUTH_SECRET in prod.
 // PUBLIC_URL must be the address clients reach the server at (the tunnel/host
-// URL), because the OAuth discovery documents advertise absolute URLs.
-const PUBLIC_URL = (process.env.PUBLIC_URL || "http://localhost:3000").replace(/\/+$/, "");
+// URL), because the OAuth discovery documents advertise absolute URLs. On Render
+// this is auto-injected as RENDER_EXTERNAL_URL, so no manual config is needed.
+const PUBLIC_URL = (
+  process.env.PUBLIC_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  "http://localhost:3000"
+).replace(/\/+$/, "");
 
 const oauth = new AnonymousJwtOAuthProvider();
 

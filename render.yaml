@@ -1,0 +1,29 @@
+# Render Blueprint — deploys the Free To Use MCP server as a persistent web service.
+#
+# To use: Render Dashboard → New → Blueprint → connect this repo. Render reads
+# this file, creates the service, generates AUTH_SECRET, and auto-deploys on
+# every push to `main`. PUBLIC_URL is auto-derived from RENDER_EXTERNAL_URL.
+services:
+  - name: ftu-mcp-server
+    type: web
+    runtime: node
+    # Free spins down when idle (cold start ~30-60s on the first request after
+    # inactivity, plus catalog warm-up). Switch to "starter" to stay always-on.
+    plan: free
+    region: oregon
+    branch: main
+    autoDeployTrigger: commit
+    # Build runs from the monorepo root so npm workspaces resolve. --include=dev
+    # keeps esbuild/tsc available even though Render sets NODE_ENV=production.
+    buildCommand: npm ci --include=dev && npm run build -w @freetouse/api -w ftu-mcp-server
+    startCommand: node apps/mcp-server/dist/server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Stable signing secret for JWT tokens, generated once and persisted by
+      # Render so tokens survive restarts/redeploys.
+      - key: AUTH_SECRET
+        generateValue: true
+      # PUBLIC_URL is intentionally omitted — the server falls back to
+      # RENDER_EXTERNAL_URL (the https://<service>.onrender.com URL Render injects).

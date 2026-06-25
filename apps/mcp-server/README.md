@@ -60,8 +60,27 @@ settings. The tunnel URL changes each run, so update the connector URL each time
 
 ## Deploy
 
-Any Node 18+ host works. Build, then run the compiled output with `PUBLIC_URL`
-set to the public HTTPS URL:
+### Render (recommended)
+
+This repo ships a `render.yaml` blueprint at the root. To deploy:
+
+1. Push to GitHub.
+2. **Render Dashboard → New → Blueprint → connect this repo → Apply.** Render
+   reads `render.yaml`, creates the `ftu-mcp-server` web service, generates a
+   persistent `AUTH_SECRET`, builds, and deploys. It auto-redeploys on every
+   push to `main`.
+3. When it's live, your MCP endpoint is `https://<service>.onrender.com/mcp`.
+   `PUBLIC_URL` is auto-derived from Render's `RENDER_EXTERNAL_URL` — nothing to
+   configure.
+4. Add that `…/mcp` URL as a custom connector in Claude / ChatGPT.
+
+The `free` plan spins down when idle (the first request after inactivity is slow
+while it wakes and warms the catalog). Set `plan: starter` in `render.yaml` for
+an always-on service.
+
+### Any Node host (manual)
+
+Build, then run the compiled output with `PUBLIC_URL` set to the public HTTPS URL:
 
 ```bash
 npm ci
