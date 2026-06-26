@@ -66,10 +66,28 @@ function buildServer(): McpServer {
           text: WIDGET_HTML,
           _meta: {
             ui: {
+              // resourceDomains maps to img-src/script-src/style-src/font-src/
+              // media-src — so this one list covers cover art (img), audio
+              // playback (media), and the Nunito web font. connectDomains covers
+              // any fetch/XHR the widget makes.
               csp: {
-                resourceDomains: ["https://data.freetouse.com"],
+                resourceDomains: [
+                  "https://data.freetouse.com",
+                  "https://fonts.googleapis.com",
+                  "https://fonts.gstatic.com",
+                ],
                 connectDomains: ["https://data.freetouse.com"],
               },
+            },
+            // ChatGPT-specific mirror of the CSP so it recognizes the policy
+            // (clears the "CSP off" badge) ahead of app submission.
+            "openai/widgetCSP": {
+              connect_domains: ["https://data.freetouse.com"],
+              resource_domains: [
+                "https://data.freetouse.com",
+                "https://fonts.googleapis.com",
+                "https://fonts.gstatic.com",
+              ],
             },
           },
         },

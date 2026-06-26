@@ -37,6 +37,8 @@ export interface UiTrack {
    * directly to an HTMLAudioElement.volume or a Web Audio GainNode target.
    */
   gain: number;
+  /** Downsampled loudness bars (0-100) for rendering the waveform scrubber. */
+  peaks: number[];
 }
 
 interface IndexEntry extends UiTrack {
@@ -68,6 +70,29 @@ export function formatDuration(seconds: number): string {
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Number of waveform bars sent to the widget. The API waveform is 300 points;
+// ~80 bars reads cleanly at the mini-player's width.
+const WAVE_BARS = 80;
+
+/** Downsample the 300-point loudness array to `bars` averaged integers (0-100). */
+function downsamplePeaks(waveform: number[] | undefined, bars: number): number[] {
+  if (!waveform || waveform.length === 0) return [];
+  const step = waveform.length / bars;
+  const out: number[] = [];
+  for (let i = 0; i < bars; i++) {
+    const start = Math.floor(i * step);
+    const end = Math.max(start + 1, Math.floor((i + 1) * step));
+    let sum = 0;
+    let n = 0;
+    for (let j = start; j < end && j < waveform.length; j++) {
+      sum += waveform[j];
+      n++;
+    }
+    out.push(n ? Math.round(sum / n) : 0);
+  }
+  return out;
+}
 
 function describe(
   genre: string | null,
@@ -127,6 +152,7 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     genre: t.genre,
     description: describe(t.genre, cats, tags, types),
     gain: waveformToGain(t.waveform),
+    peaks: downsamplePeaks(t.waveform, WAVE_BARS),
     downloads: t.downloads ?? 0,
     tagcat: [...tags, ...cats].join(" ").toLowerCase(),
     text: [t.title, artist, t.genre ?? ""].join(" ").toLowerCase(),
