@@ -1,6 +1,6 @@
 import express, { type Request, type Response, type RequestHandler } from "express";
 import rateLimit from "express-rate-limit";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -23,8 +23,13 @@ import {
 import { buildWidgetHtml } from "./widget.js";
 import { AnonymousJwtOAuthProvider } from "./auth.js";
 
-const WIDGET_URI = "ui://widget/results.html";
 const WIDGET_HTML = buildWidgetHtml();
+// Version the resource URI by a content hash. Hosts (e.g. ChatGPT) cache the
+// widget template by its URI, so a stable URI means a stale widget after an
+// update. Hashing the HTML makes the URI change automatically whenever the
+// widget actually changes, while unchanged deploys keep the same URI (cache hit).
+const WIDGET_VERSION = createHash("sha256").update(WIDGET_HTML).digest("hex").slice(0, 8);
+const WIDGET_URI = `ui://widget/results-${WIDGET_VERSION}.html`;
 
 // Model-facing text: a compact numbered list. Hosts without UI show this; it
 // always includes the listen/download link, a few tags, and a short blurb.
