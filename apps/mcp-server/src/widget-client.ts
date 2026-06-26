@@ -25,6 +25,7 @@ interface UiTrack {
   description?: string;
   gain?: number;
   peaks?: number[];
+  chips?: string[];
 }
 
 interface RowState {
@@ -59,6 +60,7 @@ const FALLBACK: { query?: string; tracks: UiTrack[] } = {
       art: "https://data.freetouse.com/music/tracks/4a5a2691-46b7-4624-a1f7-d83914f65c74/cover/webp/md/cover-md.webp",
       url: "https://freetouse.com/music/massobeats/remedy",
       tags: ["chillhop", "dreamy"],
+      chips: ["Lofi", "Chillhop"],
       description: "Aesthetic Lofi track with chillhop, dreamy vibes.",
       gain: 0.8,
       peaks: DEFAULT_PEAKS,
@@ -126,10 +128,7 @@ function wireAudioOnce(): void {
     }
   });
   a.addEventListener("timeupdate", () => {
-    if (active && a.duration) {
-      setProgress(active, a.currentTime / a.duration);
-      active.durEl.textContent = fmt(a.currentTime);
-    }
+    if (active && a.duration) setProgress(active, a.currentTime / a.duration);
   });
 }
 
@@ -170,7 +169,6 @@ function seek(state: RowState, frac: number): void {
   if (a.duration) {
     a.currentTime = frac * a.duration;
     setProgress(state, frac);
-    state.durEl.textContent = fmt(frac * a.duration);
   } else {
     pendingSeek = frac;
     setProgress(state, frac);
@@ -217,19 +215,22 @@ function buildRow(track: UiTrack): RowState {
   title.textContent = track.title || "Untitled";
   const artist = document.createElement("div");
   artist.className = "artist";
-  artist.textContent = [track.artist, track.genre].filter(Boolean).join(" · ");
+  artist.textContent = track.artist || "";
   meta.appendChild(title);
   meta.appendChild(artist);
-  if (track.tags && track.tags.length) {
-    const tags = document.createElement("div");
-    tags.className = "tags";
-    track.tags.slice(0, 2).forEach((tg) => {
+
+  // First two tags/categories as pills (like freetouse.com), in their own column.
+  const chipList = track.chips && track.chips.length ? track.chips : track.tags || [];
+  let chipsEl: any = null;
+  if (chipList.length) {
+    chipsEl = document.createElement("div");
+    chipsEl.className = "chips";
+    chipList.slice(0, 2).forEach((c) => {
       const s = document.createElement("span");
-      s.className = "tag";
-      s.textContent = tg;
-      tags.appendChild(s);
+      s.className = "chip";
+      s.textContent = c;
+      chipsEl.appendChild(s);
     });
-    meta.appendChild(tags);
   }
 
   const playBtn = document.createElement("button");
@@ -258,8 +259,19 @@ function buildRow(track: UiTrack): RowState {
   dlBtn.innerHTML = DL;
   dlBtn.setAttribute("aria-label", "Download " + (track.title || ""));
 
+  const vdiv = () => {
+    const d = document.createElement("div");
+    d.className = "vdiv";
+    return d;
+  };
   el.appendChild(cover);
+  el.appendChild(vdiv());
   el.appendChild(meta);
+  if (chipsEl) {
+    el.appendChild(vdiv());
+    el.appendChild(chipsEl);
+  }
+  el.appendChild(vdiv());
   el.appendChild(playBtn);
   el.appendChild(waveEl);
   el.appendChild(durEl);

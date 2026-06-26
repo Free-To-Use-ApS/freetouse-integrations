@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 // Static shell + styling for the results widget — a list of Free To Use
-// mini-players matching freetouse.com (cover, title/artist, tags, play,
+// mini-players matching freetouse.com (cover, title/artist, tag pills, play,
 // waveform scrubber, duration, download). Interactive logic lives in
 // widget-client.ts (bundled by esbuild to dist/widget-client.js, inlined below).
 // The .ftu-wave / .ftu-wave-bar rules mirror packages/ftu-style waveform.css.
@@ -17,26 +17,31 @@ const CSS = `
     --ftu-light-grey: #d1d1d1;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { margin: 0; font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1d1d1f; }
   .head { font-size: 13px; color: #8a8a8a; font-weight: 600; padding: 8px 4px 10px; }
   .list { display: flex; flex-direction: column; gap: 10px; }
 
   .player {
-    display: flex; align-items: center; gap: 14px;
+    display: flex; align-items: center; gap: 12px;
     background: #fff; border: 1px solid #ededed; border-radius: 16px;
-    padding: 10px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    padding: 10px 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04);
   }
-  .cover { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: #f1f1f1; flex: none; }
+  .cover { width: 54px; height: 54px; border-radius: 11px; object-fit: cover; background: #f1f1f1; flex: none; }
 
-  .meta { width: 150px; flex: none; min-width: 0; }
-  .title { font-weight: 700; font-size: 14px; color: #1d1d1f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .artist { font-size: 12px; color: #9a9a9a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-  .tags { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
-  .tag { font-size: 10px; font-weight: 600; color: #7a7a7a; background: #f1f1f3; border-radius: 999px; padding: 3px 8px; line-height: 1; white-space: nowrap; }
+  /* subtle vertical dividers between sections (like freetouse.com) */
+  .vdiv { width: 1px; align-self: stretch; background: #f1f1f1; flex: none; margin: 6px 0; }
 
-  .play { flex: none; width: 34px; height: 34px; border-radius: 999px; border: none; background: #efeff1; color: #3a3a3a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .play svg { width: 15px; height: 15px; fill: currentColor; }
+  .meta { width: 140px; flex: none; min-width: 0; }
+  .title { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .artist { font-size: 12.5px; color: #9a9a9a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+
+  .chips { width: 96px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+  .chip { max-width: 100%; font-size: 10.5px; font-weight: 700; color: #7a7a7a; background: #f2f2f4; border-radius: 999px; padding: 4px 10px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .play { flex: none; width: 42px; height: 42px; border-radius: 999px; border: none; background: #efeff1; color: #3a3a3a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .play svg { width: 16px; height: 16px; fill: currentColor; margin-left: 1.5px; }
   .play.playing { background: var(--ftu-primary); color: #fff; }
+  .play.playing svg { margin-left: 0; }
   .play:hover { filter: brightness(0.97); }
 
   /* Waveform (mirrors @freetouse/style waveform.css) */
@@ -59,7 +64,7 @@ const CSS = `
     }
   }
 
-  .dur { flex: none; font-size: 12px; font-weight: 600; color: #9a9a9a; min-width: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+  .dur { flex: none; font-size: 11.5px; font-weight: 700; color: #8a8a8a; background: #f4f4f6; border-radius: 8px; padding: 4px 9px; font-variant-numeric: tabular-nums; }
   .dl { flex: none; width: 30px; height: 30px; border: none; background: none; color: #9a9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
   .dl svg { width: 20px; height: 20px; }
   .dl:hover { color: var(--ftu-primary-hover); }

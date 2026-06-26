@@ -39,6 +39,8 @@ export interface UiTrack {
   gain: number;
   /** Downsampled loudness bars (0-100) for rendering the waveform scrubber. */
   peaks: number[];
+  /** First two tags/categories, capitalized — shown as pills (like freetouse.com). */
+  chips: string[];
 }
 
 interface IndexEntry extends UiTrack {
@@ -140,6 +142,13 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
   const cats = (t.categories ?? [])
     .map(([, c]) => (typeof c === "string" ? c : c?.name))
     .filter(Boolean) as string[];
+  // First two tags/categories (combined, in API order), capitalized — exactly
+  // what freetouse.com shows as pills (see canva-app TrackItem getTagLabels).
+  const chips = (t.tags_categories ?? [])
+    .map(([, item]) => (typeof item === "string" ? item : item?.name))
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => cap(s as string));
   return {
     id: t.id,
     title: t.title,
@@ -153,6 +162,7 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     description: describe(t.genre, cats, tags, types),
     gain: waveformToGain(t.waveform),
     peaks: downsamplePeaks(t.waveform, WAVE_BARS),
+    chips,
     downloads: t.downloads ?? 0,
     tagcat: [...tags, ...cats].join(" ").toLowerCase(),
     text: [t.title, artist, t.genre ?? ""].join(" ").toLowerCase(),
