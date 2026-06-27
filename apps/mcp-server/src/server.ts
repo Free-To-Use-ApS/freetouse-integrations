@@ -2,7 +2,7 @@ import express, { type Request, type Response, type RequestHandler } from "expre
 import rateLimit from "express-rate-limit";
 import { randomUUID, createHash } from "node:crypto";
 import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import {
@@ -31,6 +31,36 @@ const WIDGET_HTML = buildWidgetHtml();
 const WIDGET_VERSION = createHash("sha256").update(WIDGET_HTML).digest("hex").slice(0, 8);
 const WIDGET_URI = `ui://widget/results-${WIDGET_VERSION}.html`;
 
+// UI metadata: CSP (standard + ChatGPT mirror) so cover art, audio (media-src),
+// and the Nunito font load under strict CSP, and ChatGPT recognizes the policy.
+const WIDGET_META = {
+  ui: {
+    // resourceDomains maps to img-src/script-src/style-src/font-src/media-src.
+    csp: {
+      resourceDomains: [
+        "https://data.freetouse.com",
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+      ],
+      connectDomains: ["https://data.freetouse.com"],
+    },
+  },
+  "openai/widgetCSP": {
+    connect_domains: ["https://data.freetouse.com"],
+    resource_domains: [
+      "https://data.freetouse.com",
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com",
+    ],
+  },
+};
+
+function widgetContents(uri: string) {
+  return {
+    contents: [{ uri, mimeType: RESOURCE_MIME_TYPE, text: WIDGET_HTML, _meta: WIDGET_META }],
+  };
+}
+
 // Model-facing text: a compact numbered list. Hosts without UI show this; it
 // always includes the listen/download link, a few tags, and a short blurb.
 function formatResults(query: string, tracks: UiTrack[]): string {
@@ -53,8 +83,8 @@ function formatResults(query: string, tracks: UiTrack[]): string {
 function buildServer(): McpServer {
   const server = new McpServer({ name: "freetouse-music", version: "0.1.0" });
 
-  // The results widget, served as an MCP Apps UI resource. data.freetouse.com
-  // (mp3 + cover art) is allowlisted for both static assets and fetch/streaming.
+  // The results widget, served as an MCP Apps UI resource at the current
+  // content-hashed URI (listed + normalized for hosts).
   registerAppResource(
     server,
     "Free To Use Results",
@@ -63,41 +93,22 @@ function buildServer(): McpServer {
       mimeType: RESOURCE_MIME_TYPE,
       description: "Inline list of Free To Use tracks with an audio player",
     },
-    async () => ({
-      contents: [
-        {
-          uri: WIDGET_URI,
-          mimeType: RESOURCE_MIME_TYPE,
-          text: WIDGET_HTML,
-          _meta: {
-            ui: {
-              // resourceDomains maps to img-src/script-src/style-src/font-src/
-              // media-src — so this one list covers cover art (img), audio
-              // playback (media), and the Nunito web font. connectDomains covers
-              // any fetch/XHR the widget makes.
-              csp: {
-                resourceDomains: [
-                  "https://data.freetouse.com",
-                  "https://fonts.googleapis.com",
-                  "https://fonts.gstatic.com",
-                ],
-                connectDomains: ["https://data.freetouse.com"],
-              },
-            },
-            // ChatGPT-specific mirror of the CSP so it recognizes the policy
-            // (clears the "CSP off" badge) ahead of app submission.
-            "openai/widgetCSP": {
-              connect_domains: ["https://data.freetouse.com"],
-              resource_domains: [
-                "https://data.freetouse.com",
-                "https://fonts.googleapis.com",
-                "https://fonts.gstatic.com",
-              ],
-            },
-          },
-        },
-      ],
-    }),
+    async () => widgetContents(WIDGET_URI),
+  );
+
+  // Catch-all: serve the CURRENT widget for ANY ui://widget/* URI. Hosts cache
+  // the tool definition (with its hashed widget URI); after we ship a new widget
+  // the hash changes, but a host still holding the previous URI would otherwise
+  // get a 404 ("Failed to fetch template"). This template resolves any past or
+  // future hash to the current widget, so stale caches degrade gracefully.
+  server.registerResource(
+    "Free To Use Results (versioned)",
+    new ResourceTemplate("ui://widget/{file}", { list: undefined }),
+    {
+      mimeType: RESOURCE_MIME_TYPE,
+      description: "Versioned Free To Use results widget",
+    },
+    async (uri) => widgetContents(uri.href),
   );
 
   // One search tool, graceful degradation:
