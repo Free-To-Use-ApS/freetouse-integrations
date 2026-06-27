@@ -1,16 +1,19 @@
 import { readFileSync } from "node:fs";
 
 // Static shell + styling for the results widget — a list of Free To Use
-// mini-players matching freetouse.com (cover, title/artist, tag pills, play,
-// waveform scrubber, duration, download). Interactive logic lives in
-// widget-client.ts (bundled by esbuild to dist/widget-client.js, inlined below).
+// mini-players matching freetouse.com (flush cover, title/artist, centered tag
+// pills, play, symmetric waveform scrubber, duration, download). Interactive
+// logic lives in widget-client.ts (bundled by esbuild, inlined below).
 // The .ftu-wave / .ftu-wave-bar rules mirror packages/ftu-style waveform.css.
 const FONT_LINKS =
   '<link rel="preconnect" href="https://fonts.googleapis.com" />' +
   '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />' +
   '<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />';
 
+// @import is repeated here (first rule) because some host iframes strip <link>
+// tags but keep inline <style>; one of the two reliably loads Nunito.
 const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
   :root {
     --ftu-primary: #7569de;
     --ftu-primary-hover: #635ecc;
@@ -21,39 +24,36 @@ const CSS = `
   .head { font-size: 13px; color: #8a8a8a; font-weight: 600; padding: 8px 4px 10px; }
   .list { display: flex; flex-direction: column; gap: 10px; }
 
-  .player {
-    display: flex; align-items: center; gap: 12px;
-    background: #fff; border: 1px solid #ededed; border-radius: 16px;
-    padding: 10px 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04);
-  }
-  .cover { width: 54px; height: 54px; border-radius: 11px; object-fit: cover; background: #f1f1f1; flex: none; }
+  /* Card. overflow:hidden so the flush cover's left corners clip to the card
+     radius while its right corners stay square. */
+  .player { display: flex; align-items: stretch; background: #fff; border: 1px solid #ededed; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .cover { width: 66px; align-self: stretch; object-fit: cover; background: #f1f1f1; flex: none; }
+  .body { flex: 1; display: flex; align-items: center; gap: 11px; padding: 9px 14px; min-width: 0; }
 
-  /* subtle vertical dividers between sections (like freetouse.com) */
-  .vdiv { width: 1px; align-self: stretch; background: #f1f1f1; flex: none; margin: 6px 0; }
+  .vdiv { width: 1px; align-self: stretch; background: #ededed; flex: none; margin: 5px 0; }
 
-  .meta { width: 140px; flex: none; min-width: 0; }
-  .title { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .artist { font-size: 12.5px; color: #9a9a9a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+  .meta { width: 108px; flex: none; min-width: 0; }
+  .title { font-weight: 800; font-size: 14px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .artist { font-weight: 600; font-size: 12.5px; color: #9a9a9a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
 
-  .chips { width: 96px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+  .chips { width: 76px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; }
   .chip { max-width: 100%; font-size: 10.5px; font-weight: 700; color: #7a7a7a; background: #f2f2f4; border-radius: 999px; padding: 4px 10px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .play { flex: none; width: 42px; height: 42px; border-radius: 999px; border: none; background: #efeff1; color: #3a3a3a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .play svg { width: 16px; height: 16px; fill: currentColor; margin-left: 1.5px; }
+  .play { flex: none; width: 40px; height: 40px; border-radius: 999px; border: none; background: #efeff1; color: #3a3a3a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .play svg { width: 17px; height: 17px; fill: currentColor; }
   .play.playing { background: var(--ftu-primary); color: #fff; }
-  .play.playing svg { margin-left: 0; }
   .play:hover { filter: brightness(0.97); }
 
-  /* Waveform (mirrors @freetouse/style waveform.css) */
+  /* Symmetric waveform (bars grow from the centre, like freetouse.com) */
   .ftu-wave {
     --wave-bg-base: var(--ftu-light-grey);
     --wave-bg-played: var(--ftu-primary);
     --wave-transition-duration: 450ms;
     flex: 1; min-width: 60px; height: 2.75rem;
-    display: flex; align-items: flex-end; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     column-gap: 1px; position: relative; overflow: hidden; cursor: pointer; touch-action: none;
   }
-  .ftu-wave-bar { display: block; width: 100%; min-height: 1px; background: var(--wave-bg-base); transition: background-color var(--wave-transition-duration) ease; }
+  .ftu-wave-bar { display: block; width: 100%; min-height: 2px; border-radius: 1px; background: var(--wave-bg-base); transition: background-color var(--wave-transition-duration) ease; }
   .ftu-wave-bar[data-played="true"] { background-color: var(--wave-bg-played); }
   @media (pointer: fine) {
     .ftu-wave-bar:hover:not([data-played="true"]),
@@ -65,8 +65,8 @@ const CSS = `
   }
 
   .dur { flex: none; font-size: 11.5px; font-weight: 700; color: #8a8a8a; background: #f4f4f6; border-radius: 8px; padding: 4px 9px; font-variant-numeric: tabular-nums; }
-  .dl { flex: none; width: 30px; height: 30px; border: none; background: none; color: #9a9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .dl svg { width: 20px; height: 20px; }
+  .dl { flex: none; width: 38px; height: 38px; border: none; background: none; color: #9a9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .dl svg { width: 28px; height: 28px; fill: currentColor; }
   .dl:hover { color: var(--ftu-primary-hover); }
 `;
 

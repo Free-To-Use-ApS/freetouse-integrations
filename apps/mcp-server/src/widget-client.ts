@@ -37,12 +37,14 @@ interface RowState {
   idx: number; // index of last "played" bar (-1 = none)
 }
 
-const PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>';
-const PAUSE = '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect></svg>';
+// Bootstrap Icons (play-fill, pause-fill, cloud-download) to match freetouse.com.
+const PLAY = '<svg viewBox="0 0 16 16"><path d="m11.596 8.697-6.363 3.692C4.692 12.71 4 12.345 4 11.692V4.308c0-.653.692-1.018 1.233-.697l6.363 3.692a.802.802 0 0 1 0 1.394z"></path></svg>';
+const PAUSE = '<svg viewBox="0 0 16 16"><path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"></path></svg>';
 const DL =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-  '<path d="M7 18a4 4 0 0 1-.5-7.97 5.5 5.5 0 0 1 10.7-1.3A4.5 4.5 0 0 1 17 18"></path>' +
-  '<path d="M12 11v6"></path><path d="M9.5 15.5 12 18l2.5-2.5"></path></svg>';
+  '<svg viewBox="0 0 16 16">' +
+  '<path d="M4.406 1.342A5.53 5.53 0 0 1 8 0c2.69 0 4.923 2 5.166 4.579C14.758 4.804 16 6.137 16 7.773 16 9.569 14.502 11 12.687 11H10a.5.5 0 0 1 0-1h2.688C13.979 10 15 8.988 15 7.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 2.825 10.328 1 8 1a4.53 4.53 0 0 0-2.941 1.1c-.757.652-1.153 1.438-1.153 2.055v.448l-.445.049C2.064 4.805 1 5.952 1 7.318 1 8.785 2.23 10 3.781 10H6a.5.5 0 0 1 0 1H3.781C1.708 11 0 9.366 0 7.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"></path>' +
+  '<path d="M7.646 15.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 14.293V5.5a.5.5 0 0 0-1 0v8.793l-2.146-2.147a.5.5 0 0 0-.708.708z"></path>' +
+  "</svg>";
 
 const DEFAULT_PEAKS: number[] = Array.from({ length: 80 }, (_v, i) =>
   22 + Math.round(45 * Math.abs(Math.sin(i / 3.5))),
@@ -264,18 +266,24 @@ function buildRow(track: UiTrack): RowState {
     d.className = "vdiv";
     return d;
   };
-  el.appendChild(cover);
-  el.appendChild(vdiv());
-  el.appendChild(meta);
+  // Cover sits flush against the card's left edge (no divider after it). Every-
+  // thing else lives in a padded body: meta | chips | play | wave | dur | dl,
+  // with dividers around the chips and before the download.
+  const body = document.createElement("div");
+  body.className = "body";
+  body.appendChild(meta);
   if (chipsEl) {
-    el.appendChild(vdiv());
-    el.appendChild(chipsEl);
+    body.appendChild(vdiv());
+    body.appendChild(chipsEl);
   }
-  el.appendChild(vdiv());
-  el.appendChild(playBtn);
-  el.appendChild(waveEl);
-  el.appendChild(durEl);
-  el.appendChild(dlBtn);
+  body.appendChild(vdiv());
+  body.appendChild(playBtn);
+  body.appendChild(waveEl);
+  body.appendChild(durEl);
+  body.appendChild(vdiv());
+  body.appendChild(dlBtn);
+  el.appendChild(cover);
+  el.appendChild(body);
 
   const state: RowState = { track, el, bars, durEl, playBtn, idx: -1 };
 
