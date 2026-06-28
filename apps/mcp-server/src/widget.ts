@@ -37,11 +37,12 @@ const CSS = `
   .artist { font-weight: 600; font-size: 12.5px; color: #9a9a9a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
 
   .chips { width: 76px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; }
-  .chip { max-width: 100%; font-size: 10.5px; font-weight: 700; color: #7a7a7a; background: #f2f2f4; border-radius: 999px; padding: 4px 10px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip { max-width: 100%; font-size: 10.5px; font-weight: 600; color: #7a7a7a; background: #f2f2f4; border-radius: 999px; padding: 4px 10px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .play { flex: none; width: 40px; height: 40px; border-radius: 999px; border: none; background: #efeff1; color: #3a3a3a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .play svg { width: 17px; height: 17px; fill: currentColor; }
-  .play.playing { background: var(--ftu-primary); color: #fff; }
+  /* The play/pause SVGs include their own circle + colour (grey idle, purple
+     playing), so the button is just a sizing wrapper. */
+  .play { flex: none; width: 36px; height: 36px; border: none; background: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .play svg { width: 100%; height: 100%; display: block; }
   .play:hover { filter: brightness(0.97); }
 
   /* Symmetric waveform (bars grow from the centre, like freetouse.com) */
@@ -64,7 +65,7 @@ const CSS = `
     }
   }
 
-  .dur { flex: none; font-size: 11.5px; font-weight: 700; color: #8a8a8a; background: #f4f4f6; border-radius: 8px; padding: 4px 9px; font-variant-numeric: tabular-nums; }
+  .dur { flex: none; font-size: 10.5px; font-weight: 600; color: #8a8a8a; background: #f4f4f6; border-radius: 8px; padding: 4px 9px; font-variant-numeric: tabular-nums; }
   .dl { flex: none; width: 38px; height: 38px; border: none; background: none; color: #9a9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
   .dl svg { width: 28px; height: 28px; fill: currentColor; }
   .dl:hover { color: var(--ftu-primary-hover); }
