@@ -1,24 +1,26 @@
 // Domain logic over the public Free To Use API.
 //
-// Strategy: the API's text search is strict (multi-word natural-language
-// queries often return nothing), so instead we hold the whole catalog in an
-// in-memory index (one /tracks/all request, ~1.5k tracks) and rank it locally
-// by how well each track's tags / categories / genre / title match the query.
-// This is robust to phrasing, instant per search, and easy on the API.
+// We hold the whole catalog in an in-memory index (one /tracks/all request,
+// ~1.5k tracks, refreshed every 6h) and rank/filter it locally. This is robust
+// to phrasing, instant per request, supports pagination, and is easy on the API.
+// find_similar is the exception — it uses the API's own /related model.
 //
-// We only ever expose a trimmed shape (no raw waveform / stats) plus a short,
-// honest description synthesized from real metadata and a precomputed loudness
-// `gain` (derived from the waveform) so downstream players can level volume.
+// We only ever expose a trimmed shape (no raw waveform / stats) plus a short
+// description, a precomputed loudness `gain`, ready-to-use attribution text, and
+// a premium flag.
 import {
   getCategories,
+  getRelatedTracks,
   getTracks,
   waveformToGain,
   type Track,
+  type Category,
 } from "@freetouse/api";
 
 export interface UiTrack {
   id: string;
   title: string;
+  /** All artists, comma-joined (e.g. "Pufino" or "Aylex, Limujii"). */
   artist: string;
   /** seconds */
   duration: number;
@@ -31,30 +33,39 @@ export interface UiTrack {
   genre: string | null;
   /** One-sentence blurb synthesized from genre + categories + tags */
   description: string;
-  /**
-   * Attenuate-only loudness multiplier (0..1) derived from the track's waveform,
-   * so a downstream player can keep volume consistent across tracks. Assign
-   * directly to an HTMLAudioElement.volume or a Web Audio GainNode target.
-   */
+  /** Loudness multiplier (0..1) from the waveform, for consistent volume. */
   gain: number;
-  /** Downsampled loudness bars (0-100) for rendering the waveform scrubber. */
+  /** Downsampled loudness bars (0-100) for the waveform scrubber. */
   peaks: number[];
-  /** First two tags/categories, capitalized — shown as pills (like freetouse.com). */
+  /** First two tags/categories, capitalized — shown as pills. */
   chips: string[];
+  /** True if the track requires a subscription or single-track license. */
+  premium: boolean;
+  /** Ready-to-paste credit text (same format as the FTU apps). */
+  attribution: string;
 }
 
 interface IndexEntry extends UiTrack {
   downloads: number;
-  /** Lowercased fields, kept separate so a title/artist hit can outrank a tag hit. */
   titleLc: string;
   artistLc: string;
   genreLc: string;
-  /** Lowercased tag + category names. */
+  /** Lowercased tag + category names (combined). */
   tagcat: string;
+  /** Lowercased category names only (for browse-by-category). */
+  catsLc: string[];
 }
 
-export const MAX_RESULTS = 12;
-export const DEFAULT_RESULTS = 6;
+/** A page of results plus the totals a client needs to paginate. */
+export interface TrackPage {
+  tracks: UiTrack[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export const DEFAULT_RESULTS = 20;
+export const MAX_RESULTS = 50;
 
 // --- formatting helpers -----------------------------------------------------
 
@@ -75,11 +86,8 @@ export function formatDuration(seconds: number): string {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// Number of waveform bars sent to the widget. The API waveform is 300 points;
-// ~80 bars reads cleanly at the mini-player's width.
 const WAVE_BARS = 80;
 
-/** Downsample the 300-point loudness array to `bars` averaged integers (0-100). */
 function downsamplePeaks(waveform: number[] | undefined, bars: number): number[] {
   if (!waveform || waveform.length === 0) return [];
   const step = waveform.length / bars;
@@ -120,32 +128,54 @@ function describe(
   return s + ".";
 }
 
-// --- catalog index ----------------------------------------------------------
+// --- categories (cached) ----------------------------------------------------
 
-const INDEX_TTL = 6 * 60 * 60 * 1000; // 6h
-let indexCache: { entries: IndexEntry[]; expires: number } | null = null;
-let indexLoading: Promise<IndexEntry[]> | null = null;
+const CATEGORY_TTL = 24 * 60 * 60 * 1000;
+let categoryCache: { list: Category[]; expires: number } | null = null;
+
+async function categoriesList(): Promise<Category[]> {
+  if (categoryCache && categoryCache.expires > Date.now()) return categoryCache.list;
+  try {
+    const res = await getCategories({ limit: 300 });
+    categoryCache = { list: res.data ?? [], expires: Date.now() + CATEGORY_TTL };
+  } catch {
+    if (categoryCache) return categoryCache.list;
+    categoryCache = { list: [], expires: Date.now() + 60 * 1000 };
+  }
+  return categoryCache.list;
+}
 
 async function categoryTypes(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-  try {
-    const res = await getCategories({ limit: 200 });
-    for (const c of res.data) map.set(c.name, c.type);
-  } catch {
-    /* description degrades gracefully without type info */
-  }
+  for (const c of await categoriesList()) map.set(c.name, c.type);
   return map;
+}
+
+/** Category names grouped by type (Genre / Mood / Video), for browsing. */
+export async function listCategories(): Promise<{ type: string; categories: string[] }[]> {
+  const groups = new Map<string, string[]>();
+  for (const c of await categoriesList()) {
+    if (!groups.has(c.type)) groups.set(c.type, []);
+    groups.get(c.type)!.push(c.name);
+  }
+  return [...groups.entries()].map(([type, categories]) => ({ type, categories }));
+}
+
+// --- track mapping ----------------------------------------------------------
+
+function attributionFor(title: string, artist: string): string {
+  return `Music track: ${title} by ${artist}\nSource: https://freetouse.com/music`;
 }
 
 function toEntry(t: Track, types: Map<string, string>): IndexEntry {
   const artists = (t.artists ?? []).map(([, a]) => a?.name).filter(Boolean) as string[];
-  const artist = artists[0] ?? "Free To Use";
+  const artist = artists.join(", ") || "Free To Use";
+  const firstArtist = artists[0] ?? "Free To Use";
+  const title = t.title ?? "Untitled";
   const tags = (t.tags ?? []).map(([, name]) => name).filter(Boolean) as string[];
   const cats = (t.categories ?? [])
     .map(([, c]) => (typeof c === "string" ? c : c?.name))
     .filter(Boolean) as string[];
-  // First two tags/categories (combined, in API order), capitalized — exactly
-  // what freetouse.com shows as pills (see canva-app TrackItem getTagLabels).
   const chips = (t.tags_categories ?? [])
     .map(([, item]) => (typeof item === "string" ? item : item?.name))
     .filter(Boolean)
@@ -153,32 +183,48 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     .map((s) => cap(s as string));
   return {
     id: t.id,
-    title: t.title,
+    title,
     artist,
-    duration: t.duration,
-    mp3: t.files.mp3,
+    duration: t.duration ?? 0,
+    mp3: t.files?.mp3 ?? "",
     art: t.thumbnails?.md ?? t.thumbnails?.lg ?? "",
-    url: `https://freetouse.com/music/${slug(artist)}/${slug(t.title)}`,
+    url: `https://freetouse.com/music/${slug(firstArtist)}/${slug(title)}`,
     tags: tags.slice(0, 5),
     genre: t.genre,
     description: describe(t.genre, cats, tags, types),
     gain: waveformToGain(t.waveform),
     peaks: downsamplePeaks(t.waveform, WAVE_BARS),
     chips,
+    premium: Boolean(t.is_premium),
+    attribution: attributionFor(title, artist),
     downloads: t.downloads ?? 0,
-    titleLc: t.title.toLowerCase(),
+    titleLc: title.toLowerCase(),
     artistLc: artist.toLowerCase(),
     genreLc: (t.genre ?? "").toLowerCase(),
     tagcat: [...tags, ...cats].join(" ").toLowerCase(),
+    catsLc: cats.map((c) => c.toLowerCase()),
   };
 }
 
+// --- catalog index ----------------------------------------------------------
+
+const INDEX_TTL = 6 * 60 * 60 * 1000; // 6h
+let indexCache: { entries: IndexEntry[]; expires: number } | null = null;
+let indexLoading: Promise<IndexEntry[]> | null = null;
+
 async function buildIndex(): Promise<IndexEntry[]> {
   const types = await categoryTypes();
-  // The whole catalog returns in a single request; staff_order is the default
-  // and we preserve it for the empty-query (curated) case.
   const res = await getTracks({ limit: 2000, order: "staff_order" });
-  return (res.data ?? []).map((t) => toEntry(t, types));
+  // Isolate per-track failures: one malformed record must not abort the whole
+  // index. Skip entries missing the essentials (playable mp3, title).
+  return (res.data ?? []).flatMap((t) => {
+    try {
+      if (!t?.files?.mp3 || !t?.title) return [];
+      return [toEntry(t, types)];
+    } catch {
+      return [];
+    }
+  });
 }
 
 async function getIndex(): Promise<IndexEntry[]> {
@@ -192,7 +238,6 @@ async function getIndex(): Promise<IndexEntry[]> {
     .finally(() => {
       indexLoading = null;
     });
-  // If a refresh fails but we have a stale copy, keep serving it.
   try {
     return await indexLoading;
   } catch (e) {
@@ -201,7 +246,7 @@ async function getIndex(): Promise<IndexEntry[]> {
   }
 }
 
-/** Pre-warm the index at startup so the first search is instant. */
+/** Pre-warm the index at startup so the first request is instant. */
 export async function warmUp(): Promise<number> {
   const entries = await getIndex();
   return entries.length;
@@ -217,62 +262,140 @@ const STOPWORDS = new Set([
   "give", "play", "something", "kind", "type", "royalty", "free",
 ]);
 
-function terms(query: string): string[] {
+// Each query word becomes a group of variants (the word + a light stem). Grouping
+// (rather than a flat list) lets score() credit each word once even when the word
+// and its stem both match — avoids inflating tracks that contain the longer form.
+function terms(query: string): string[][] {
   const raw = query
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
-  const out = new Set<string>();
+  const groups: string[][] = [];
+  const seen = new Set<string>();
   for (const w of raw) {
-    out.add(w);
-    // light stemming so "studying"~"study", "beats"~"beat", "relaxing"~"relax"
-    if (w.endsWith("ing") && w.length > 5) out.add(w.slice(0, -3));
-    else if (w.endsWith("s") && w.length > 3) out.add(w.slice(0, -1));
+    if (seen.has(w)) continue;
+    seen.add(w);
+    const variants = [w];
+    if (w.endsWith("ing") && w.length > 5) variants.push(w.slice(0, -3));
+    else if (w.endsWith("s") && w.length > 3) variants.push(w.slice(0, -1));
+    groups.push(variants);
   }
-  return [...out];
+  return groups;
 }
 
-function score(entry: IndexEntry, ts: string[]): number {
+/** Whether a query yields any searchable terms (false for empty / all-stopword). */
+export function hasUsableTerms(query: string): boolean {
+  return terms(query ?? "").length > 0;
+}
+
+function score(entry: IndexEntry, groups: string[][]): number {
   let s = 0;
-  for (const t of ts) {
-    // Title / artist are the strongest signals (the user named a track or
-    // artist), so they outrank a tag/category match; genre is weakest.
-    if (entry.titleLc.includes(t)) s += 5;
-    else if (entry.artistLc.includes(t)) s += 5;
-    else if (entry.tagcat.includes(t)) s += 3;
-    else if (entry.genreLc.includes(t)) s += 2;
+  for (const variants of groups) {
+    // Credit each query word once, at the strength of its best-matching field.
+    let best = 0;
+    for (const t of variants) {
+      let f = 0;
+      if (entry.titleLc.includes(t)) f = 5;
+      else if (entry.artistLc.includes(t)) f = 5;
+      else if (entry.tagcat.includes(t)) f = 3;
+      else if (entry.genreLc.includes(t)) f = 2;
+      if (f > best) best = f;
+    }
+    s += best;
   }
   return s;
 }
 
 function strip(e: IndexEntry): UiTrack {
-  const { downloads: _d, tagcat: _tc, titleLc: _t, artistLc: _a, genreLc: _g, ...ui } = e;
+  const {
+    downloads: _d,
+    tagcat: _tc,
+    titleLc: _t,
+    artistLc: _a,
+    genreLc: _g,
+    catsLc: _c,
+    ...ui
+  } = e;
   return ui;
 }
 
-/**
- * Find tracks matching a free-text query (mood / genre / activity / vibe).
- * Ranks the local catalog by tag/category/genre/title matches. Empty query
- * returns curated (staff-order) tracks. Returns [] when nothing matches.
- */
-export async function searchMusic(
-  query: string,
-  limit: number = DEFAULT_RESULTS,
-): Promise<UiTrack[]> {
-  const n = Math.min(Math.max(1, Math.floor(limit) || DEFAULT_RESULTS), MAX_RESULTS);
+function clampLimit(limit?: number): number {
+  return Math.min(Math.max(1, Math.floor(limit || DEFAULT_RESULTS)), MAX_RESULTS);
+}
+
+function paginate(entries: IndexEntry[], limit?: number, offset = 0): TrackPage {
+  const n = clampLimit(limit);
+  const start = Math.max(0, Math.floor(offset) || 0);
+  return {
+    tracks: entries.slice(start, start + n).map(strip),
+    total: entries.length,
+    offset: start,
+    limit: n,
+  };
+}
+
+// --- public API -------------------------------------------------------------
+
+/** Search the catalog by mood / genre / activity / artist / title. */
+export async function searchMusic(query: string, limit?: number, offset = 0): Promise<TrackPage> {
   const entries = await getIndex();
-
   const ts = terms(query ?? "");
-  if (ts.length === 0) {
-    return entries.slice(0, n).map(strip); // curated picks
-  }
-
+  if (ts.length === 0) return paginate(entries, limit, offset); // curated (staff order)
   const ranked = entries
     .map((e) => ({ e, s: score(e, ts) }))
     .filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s || b.e.downloads - a.e.downloads)
-    .slice(0, n)
-    .map((x) => strip(x.e));
+    .map((x) => x.e);
+  return paginate(ranked, limit, offset);
+}
 
-  return ranked;
+/** All tracks by an artist (case-insensitive name match), in staff order. */
+export async function browseArtist(artist: string, limit?: number, offset = 0): Promise<TrackPage> {
+  const q = (artist ?? "").trim().toLowerCase();
+  if (!q) return paginate([], limit, offset);
+  const entries = await getIndex();
+  // Exact name match first (split the comma-joined multi-artist field), so
+  // "li" doesn't pull in "Limujii"/"Charlie". Fall back to substring only for
+  // longer queries when nothing matched exactly (handles partial artist names).
+  let matches = entries.filter((e) => e.artistLc === q || e.artistLc.split(", ").includes(q));
+  if (matches.length === 0 && q.length >= 3) {
+    matches = entries.filter((e) => e.artistLc.includes(q));
+  }
+  return paginate(matches, limit, offset);
+}
+
+/** All tracks in a category (Genre / Mood / Video), in staff order. */
+export async function browseCategory(
+  category: string,
+  limit?: number,
+  offset = 0,
+): Promise<TrackPage> {
+  const q = (category ?? "").trim().toLowerCase();
+  const entries = await getIndex();
+  const matches = q ? entries.filter((e) => e.catsLc.includes(q)) : [];
+  return paginate(matches, limit, offset);
+}
+
+/** Tracks similar to a given track id, using the API's /related model. */
+export async function findSimilar(trackId: string, limit?: number, offset = 0): Promise<TrackPage> {
+  const n = clampLimit(limit);
+  const start = Math.max(0, Math.floor(offset) || 0);
+  const types = await categoryTypes();
+  const res = await getRelatedTracks(trackId, {
+    limit: n,
+    offset: start,
+    order: "similarity",
+    sort: "desc",
+  });
+  const data = res.data ?? [];
+  // The /related endpoint echoes the requested offset into pagination.count once
+  // offset overshoots the real total, which would inflate "X of N". An empty page
+  // means we've reached the end — report total = start so hasMore is false.
+  const total = data.length > 0 ? (res.pagination?.count ?? data.length) : start;
+  return {
+    tracks: data.map((t) => strip(toEntry(t, types))),
+    total,
+    offset: start,
+    limit: n,
+  };
 }

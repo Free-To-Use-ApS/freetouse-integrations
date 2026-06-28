@@ -39,6 +39,12 @@ const CSS = `
 
   .chips { width: 76px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; }
   .chip { max-width: 100%; font-size: 10.5px; font-weight: 400; color: #7a7a7a; background: #f2f2f4; border-radius: 999px; padding: 4px 10px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chip.premium { background: #fff3e0; color: #b26a00; font-weight: 600; }
+
+  .more { display: flex; justify-content: center; padding: 4px 0 2px; }
+  .loadmore { font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ftu-primary); background: #f2f2f7; border: none; border-radius: 999px; padding: 8px 18px; cursor: pointer; }
+  .loadmore:hover { background: #ececf3; }
+  .loadmore:disabled { opacity: .6; cursor: default; }
 
   /* The play/pause SVGs include their own circle + colour (grey idle, purple
      playing), so the button is just a sizing wrapper. */
@@ -75,6 +81,7 @@ const CSS = `
 const BODY = `
   <div class="head" id="head">Free To Use</div>
   <div class="list" id="list"></div>
+  <div class="more" id="more"></div>
   <audio id="audio" preload="none"></audio>
 `;
 

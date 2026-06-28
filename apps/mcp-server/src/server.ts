@@ -14,11 +14,16 @@ import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelconte
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import {
   searchMusic,
+  browseArtist,
+  browseCategory,
+  findSimilar,
+  listCategories,
+  hasUsableTerms,
   warmUp,
   formatDuration,
   DEFAULT_RESULTS,
   MAX_RESULTS,
-  type UiTrack,
+  type TrackPage,
 } from "./ftu.js";
 import { buildWidgetHtml } from "./widget.js";
 import { AnonymousJwtOAuthProvider } from "./auth.js";
@@ -58,24 +63,110 @@ function widgetContents(uri: string) {
   };
 }
 
-// Model-facing text: a compact numbered list. Hosts without UI show this; it
-// always includes the listen/download link, a few tags, and a short blurb.
-function formatResults(query: string, tracks: UiTrack[]): string {
+const FRIENDLY_ERROR =
+  "Sorry — Free To Use is temporarily unavailable. Please try again in a moment.";
+
+// Shared, reusable arg schemas for the track tools.
+const limitArg = z
+  .number()
+  .int()
+  .min(1)
+  .max(MAX_RESULTS)
+  .optional()
+  .describe(`How many tracks to return (1-${MAX_RESULTS}, default ${DEFAULT_RESULTS}).`);
+const offsetArg = z
+  .number()
+  .int()
+  .min(0)
+  .optional()
+  .describe("Skip this many results — for paging to the next page (the widget's Load more uses this).");
+
+interface MoreRef {
+  tool: string;
+  args: Record<string, unknown>;
+}
+
+function errorResult() {
+  return { content: [{ type: "text" as const, text: FRIENDLY_ERROR }] };
+}
+
+// Model-facing text for a page of tracks (also the fallback for hosts without a
+// widget). Flags premium tracks and reminds the model how to attribute.
+function formatPage(heading: string, page: TrackPage): string {
+  const { tracks, offset, total, limit } = page;
   if (tracks.length === 0) {
-    return `No Free To Use tracks found${query ? ` for "${query}"` : ""}. Try a mood, genre, or activity like "calm piano", "upbeat workout", or "lofi study".`;
+    return `${heading}\n\nNo tracks found. Try another mood, genre, artist, or category — e.g. "calm piano", "Pufino", or use list_categories.`;
   }
-  const header = query
-    ? `Found ${tracks.length} Free To Use track${tracks.length > 1 ? "s" : ""} for "${query}":`
-    : `Here ${tracks.length > 1 ? "are" : "is"} ${tracks.length} Free To Use track${tracks.length > 1 ? "s" : ""}:`;
   const body = tracks
     .map((t, i) => {
       const meta = [t.artist, t.genre, formatDuration(t.duration)].filter(Boolean).join(" · ");
-      const tagLine = t.tags.length ? `\n   Tags: ${t.tags.join(", ")}` : "";
-      return `${i + 1}. **${t.title}** — ${meta}\n   ${t.description}${tagLine}\n   [Listen & download](${t.url})`;
+      const premium = t.premium
+        ? "\n   ⚠️ Premium — tell the user this track needs an active subscription or a single-track license."
+        : "";
+      return `${offset + i + 1}. **${t.title}** — ${meta}\n   ${t.description}${premium}\n   [Listen & download](${t.url})`;
     })
     .join("\n\n");
-  return `${header}\n\n${body}`;
+  const shown = offset + tracks.length;
+  const more =
+    shown < total
+      ? `\n\nShowing ${offset + 1}-${shown} of ${total}. Call the same tool with offset ${shown} for the next ${Math.min(limit, total - shown)}.`
+      : "";
+  const credit =
+    '\n\nThese tracks are free to use with attribution. Credit each as: "Music track: <title> by <artist>, Source: https://freetouse.com/music".';
+  return `${heading}\n\n${body}${more}${credit}`;
 }
+
+// Dual-channel tool result: model-facing text + widget structuredContent.
+function pageResult(heading: string, page: TrackPage, more: MoreRef | null) {
+  const hasMore = page.offset + page.tracks.length < page.total;
+  return {
+    content: [{ type: "text" as const, text: formatPage(heading, page) }],
+    structuredContent: {
+      heading,
+      tracks: page.tracks,
+      offset: page.offset,
+      limit: page.limit,
+      total: page.total,
+      more: hasMore ? more : null,
+    },
+  };
+}
+
+// Wraps a track-tool handler with structured logging + graceful error handling.
+async function run(
+  tool: string,
+  logArgs: Record<string, unknown>,
+  produce: () => Promise<{ heading: string; page: TrackPage; more: MoreRef }>,
+) {
+  const start = Date.now();
+  try {
+    const { heading, page, more } = await produce();
+    console.log(
+      JSON.stringify({
+        evt: "tool",
+        tool,
+        ...logArgs,
+        ms: Date.now() - start,
+        results: page.tracks.length,
+        total: page.total,
+      }),
+    );
+    return pageResult(heading, page, more);
+  } catch (e) {
+    console.warn(
+      JSON.stringify({
+        evt: "tool_error",
+        tool,
+        ...logArgs,
+        ms: Date.now() - start,
+        error: String((e as Error)?.message ?? e),
+      }),
+    );
+    return errorResult();
+  }
+}
+
+const plural = (n: number, s = "s") => (n === 1 ? "" : s);
 
 function buildServer(): McpServer {
   const server = new McpServer({ name: "freetouse-music", version: "0.1.0" });
@@ -108,11 +199,13 @@ function buildServer(): McpServer {
     async (uri) => widgetContents(uri.href),
   );
 
-  // One search tool, graceful degradation:
-  //  - `content` is a compact numbered list with listen/download links, tags,
-  //    and a short description — what hosts WITHOUT UI show (e.g. Claude today).
-  //  - `_meta.ui.resourceUri` + `structuredContent` bind the results widget —
-  //    what hosts WITH UI render instead (e.g. ChatGPT). Same tool, both paths.
+  // All track tools share: read-only + open-world annotations, and they bind the
+  // results widget so hosts with UI render the players while hosts without UI
+  // fall back to the model-facing text from formatPage().
+  const trackAnnotations = { readOnlyHint: true, openWorldHint: true };
+  const widgetMeta = { ui: { resourceUri: WIDGET_URI } };
+
+  // search_music — the primary entry point.
   registerAppTool(
     server,
     "search_music",
@@ -120,42 +213,148 @@ function buildServer(): McpServer {
       title: "Search Free To Use music",
       description:
         "Find royalty-free Free To Use music and present it to the user. The tracks " +
-        "returned are shown directly to the user as interactive players (cover, " +
-        "waveform, play, download), so the result of ONE call IS your answer — make " +
-        "that single call return exactly the tracks the user should see. " +
-        "Put the user's request straight into the query: an artist name (e.g. " +
-        '"Pufino"), a specific track title (e.g. "Magnificent"), or a mood/genre/' +
-        'activity (e.g. "calm piano", "energetic workout", "lofi"). Set limit to how ' +
-        "many they asked for. Avoid a broad search followed by re-listing a different " +
-        "subset in text — instead search precisely so the players show the right " +
-        "tracks. Use whenever the user wants background music for videos, streams, " +
-        "podcasts, or other content.",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+        "returned are shown to the user as interactive players (cover, waveform, play, " +
+        "download), so the result of ONE call IS your answer — make that single call " +
+        "return exactly the tracks the user should see. Put the request straight into " +
+        'the query: a mood/genre/activity ("calm piano", "energetic workout", "lofi"), ' +
+        'an artist ("Pufino"), or a track title ("Magnificent"). Title/artist matches ' +
+        "rank first. For 'more like this' use find_similar; to browse a genre/mood use " +
+        "browse_category; for an artist's catalog use browse_artist.",
+      annotations: trackAnnotations,
       inputSchema: {
         query: z
           .string()
           .describe(
-            'What to find — an artist name ("Pufino"), a track title ("Magnificent"), ' +
-              'or a mood/genre/activity ("upbeat corporate", "sad piano", "lofi study"). ' +
-              "Title and artist matches rank first. Leave empty for staff-picked popular tracks.",
+            'What to find — a mood/genre/activity ("upbeat corporate", "sad piano"), an ' +
+              'artist ("Pufino"), or a track title ("Magnificent"). Empty = staff picks.',
           ),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(MAX_RESULTS)
-          .optional()
-          .describe(`How many tracks to return (1-${MAX_RESULTS}, default ${DEFAULT_RESULTS}).`),
+        limit: limitArg,
+        offset: offsetArg,
       },
-      _meta: { ui: { resourceUri: WIDGET_URI } },
+      _meta: widgetMeta,
     },
-    async ({ query, limit }) => {
-      const q = query ?? "";
-      const tracks = await searchMusic(q, limit ?? DEFAULT_RESULTS);
-      return {
-        content: [{ type: "text", text: formatResults(q, tracks) }],
-        structuredContent: { query: q, tracks },
-      };
+    async ({ query, limit, offset }) =>
+      run("search_music", { query, limit, offset }, async () => {
+        const q = query ?? "";
+        const page = await searchMusic(q, limit, offset ?? 0);
+        // A query of only stopwords (e.g. "play some music") yields staff picks,
+        // not a real search — label it honestly rather than "N results for …".
+        const heading =
+          q && hasUsableTerms(q)
+            ? `Free To Use — ${page.total} result${plural(page.total)} for "${q}"`
+            : "Free To Use — staff picks";
+        return { heading, page, more: { tool: "search_music", args: { query: q, limit: page.limit } } };
+      }),
+  );
+
+  // find_similar — "more like this", via the API's /related model.
+  registerAppTool(
+    server,
+    "find_similar",
+    {
+      title: "Find similar Free To Use tracks",
+      description:
+        "Given the id of a track from a previous result, return tracks with a similar " +
+        "vibe, shown to the user as players. Use when the user asks for 'more like this'.",
+      annotations: trackAnnotations,
+      inputSchema: {
+        track_id: z.string().describe("The id of a track from a previous search/browse result."),
+        limit: limitArg,
+        offset: offsetArg,
+      },
+      _meta: widgetMeta,
+    },
+    async ({ track_id, limit, offset }) =>
+      run("find_similar", { track_id, limit, offset }, async () => {
+        const page = await findSimilar(track_id, limit, offset ?? 0);
+        return {
+          heading: "Similar Free To Use tracks",
+          page,
+          more: { tool: "find_similar", args: { track_id, limit: page.limit } },
+        };
+      }),
+  );
+
+  // browse_category — all tracks in a genre / mood / video use-case.
+  registerAppTool(
+    server,
+    "browse_category",
+    {
+      title: "Browse a Free To Use category",
+      description:
+        "List tracks in a category — a genre, mood, or video use-case — shown to the " +
+        "user as players. Call list_categories first if unsure of the exact name.",
+      annotations: trackAnnotations,
+      inputSchema: {
+        category: z
+          .string()
+          .describe('Exact category name, e.g. "Lofi", "Happy", "Vlog". See list_categories.'),
+        limit: limitArg,
+        offset: offsetArg,
+      },
+      _meta: widgetMeta,
+    },
+    async ({ category, limit, offset }) =>
+      run("browse_category", { category, limit, offset }, async () => {
+        const page = await browseCategory(category, limit, offset ?? 0);
+        const heading = `Free To Use — ${page.total} "${category}" track${plural(page.total)}`;
+        return { heading, page, more: { tool: "browse_category", args: { category, limit: page.limit } } };
+      }),
+  );
+
+  // browse_artist — an artist's whole catalog.
+  registerAppTool(
+    server,
+    "browse_artist",
+    {
+      title: "Browse a Free To Use artist",
+      description:
+        "List all tracks by an artist (e.g. \"Pufino\", \"Lukrembo\"), shown to the user as players.",
+      annotations: trackAnnotations,
+      inputSchema: {
+        artist: z.string().describe('Artist name, e.g. "Pufino".'),
+        limit: limitArg,
+        offset: offsetArg,
+      },
+      _meta: widgetMeta,
+    },
+    async ({ artist, limit, offset }) =>
+      run("browse_artist", { artist, limit, offset }, async () => {
+        const page = await browseArtist(artist, limit, offset ?? 0);
+        const heading = `Free To Use — ${page.total} track${plural(page.total)} by ${artist}`;
+        return { heading, page, more: { tool: "browse_artist", args: { artist, limit: page.limit } } };
+      }),
+  );
+
+  // list_categories — text-only helper so the model knows the browse vocabulary.
+  server.registerTool(
+    "list_categories",
+    {
+      title: "List Free To Use categories",
+      description:
+        "List the available categories (genres, moods, and video use-cases) the user can " +
+        "browse, then use browse_category with an exact name.",
+      annotations: trackAnnotations,
+      inputSchema: {},
+    },
+    async () => {
+      const start = Date.now();
+      try {
+        const groups = await listCategories();
+        console.log(JSON.stringify({ evt: "tool", tool: "list_categories", ms: Date.now() - start, groups: groups.length }));
+        const text = groups.map((g) => `**${g.type}**: ${g.categories.join(", ")}`).join("\n\n");
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Free To Use categories:\n\n${text}\n\nUse browse_category with an exact name.`,
+            },
+          ],
+        };
+      } catch (e) {
+        console.warn(JSON.stringify({ evt: "tool_error", tool: "list_categories", error: String((e as Error)?.message ?? e) }));
+        return errorResult();
+      }
     },
   );
 
@@ -258,6 +457,43 @@ app.delete("/mcp", requireAuth, handleSession);
 // Health check for uptime monitors / load balancers.
 app.get("/healthz", (_req: Request, res: Response) => {
   res.json({ ok: true });
+});
+
+// Privacy policy — required for ChatGPT / Claude directory submission.
+const PRIVACY_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free To Use Music — Privacy Policy</title>
+<style>body{max-width:720px;margin:40px auto;padding:0 20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1d1d1f;line-height:1.6}h1{font-size:24px}h2{font-size:17px;margin-top:28px}a{color:#5b5bd6}small{color:#888}</style>
+</head><body>
+<h1>Free To Use Music — Privacy Policy</h1>
+<p><small>Last updated: June 2026</small></p>
+<p>The Free To Use Music connector lets AI assistants (such as ChatGPT and Claude)
+search royalty-free music from the public Free To Use catalog and present it as an
+inline player. This policy explains what it does and does not do with data.</p>
+<h2>No accounts, no personal data</h2>
+<p>The connector requires no sign-in and collects no personal information. It does
+not ask for, store, or have access to your name, email, chat history, or any
+account details. Access is anonymous.</p>
+<h2>What the connector does</h2>
+<p>When the assistant calls a tool, the connector queries the public Free To Use
+API (<a href="https://api.freetouse.com">api.freetouse.com</a>) to find tracks and
+returns track details (title, artist, artwork, audio, tags). Cover art and audio
+are served directly from Free To Use's content network.</p>
+<h2>Operational logs</h2>
+<p>For reliability and abuse prevention we keep short-lived server logs that may
+include the search terms sent to a tool and timing information. These logs are not
+linked to any personal identity, are not used for advertising, and are not sold or
+shared with third parties.</p>
+<h2>No data selling or sharing</h2>
+<p>We do not sell or share any data. The only external service the connector
+contacts is the Free To Use API to fulfil your music searches.</p>
+<h2>Contact</h2>
+<p>Questions? Contact <a href="mailto:privacy@freetouse.com">privacy@freetouse.com</a>
+or visit <a href="https://freetouse.com">freetouse.com</a>.</p>
+</body></html>`;
+
+app.get("/privacy", (_req: Request, res: Response) => {
+  res.type("html").send(PRIVACY_HTML);
 });
 
 // Convenience route: serve the widget standalone so it can be sanity-checked in

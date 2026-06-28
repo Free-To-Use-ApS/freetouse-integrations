@@ -26,6 +26,16 @@ interface UiTrack {
   gain?: number;
   peaks?: number[];
   chips?: string[];
+  premium?: boolean;
+}
+
+interface ResultData {
+  heading?: string;
+  tracks?: UiTrack[];
+  offset?: number;
+  limit?: number;
+  total?: number;
+  more?: { tool: string; args: Record<string, unknown> } | null;
 }
 
 interface RowState {
@@ -54,8 +64,12 @@ const DEFAULT_PEAKS: number[] = Array.from({ length: 80 }, (_v, i) =>
   22 + Math.round(45 * Math.abs(Math.sin(i / 3.5))),
 );
 
-const FALLBACK: { query?: string; tracks: UiTrack[] } = {
-  query: "lofi",
+const FALLBACK: ResultData = {
+  heading: 'Free To Use — 1 result for "lofi"',
+  offset: 0,
+  limit: 20,
+  total: 1,
+  more: null,
   tracks: [
     {
       title: "remedy",
@@ -70,6 +84,7 @@ const FALLBACK: { query?: string; tracks: UiTrack[] } = {
       description: "Aesthetic Lofi track with chillhop, dreamy vibes.",
       gain: 0.8,
       peaks: DEFAULT_PEAKS,
+      premium: false,
     },
   ],
 };
@@ -89,6 +104,15 @@ let active: RowState | null = null;
 let pendingSeek: number | null = null;
 let rendered = false;
 let audioWired = false;
+
+// Pagination state for "Load more".
+let curMore: { tool: string; args: Record<string, unknown> } | null = null;
+let curTotal = 0;
+let renderedCount = 0;
+let loadingMore = false;
+// Bumped on every fresh render so an in-flight Load more can detect that the
+// widget was re-rendered (e.g. a new tool result) and abandon its stale result.
+let gen = 0;
 
 // --- waveform fill ----------------------------------------------------------
 
@@ -236,12 +260,19 @@ function buildRow(track: UiTrack): RowState {
   meta.appendChild(artist);
 
   // First two tags/categories as pills (like freetouse.com), in their own column.
+  // Premium tracks get an amber "Premium" pill first.
   const chipList = track.chips && track.chips.length ? track.chips : track.tags || [];
   let chipsEl: any = null;
-  if (chipList.length) {
+  if (track.premium || chipList.length) {
     chipsEl = document.createElement("div");
     chipsEl.className = "chips";
-    chipList.slice(0, 2).forEach((c) => {
+    if (track.premium) {
+      const p = document.createElement("span");
+      p.className = "chip premium";
+      p.textContent = "Premium";
+      chipsEl.appendChild(p);
+    }
+    chipList.slice(0, track.premium ? 1 : 2).forEach((c) => {
       const s = document.createElement("span");
       s.className = "chip";
       s.textContent = c;
@@ -325,10 +356,86 @@ function buildRow(track: UiTrack): RowState {
   return state;
 }
 
-function render(data: { query?: string; tracks?: UiTrack[] } | null | undefined): void {
+function appendRows(tracks: UiTrack[]): void {
+  const list = document.getElementById("list");
+  if (!list) return;
+  tracks.forEach((t) => {
+    const st = buildRow(t);
+    rows.push(st);
+    list.appendChild(st.el);
+  });
+}
+
+function renderLoadMore(): void {
+  const moreEl = document.getElementById("more");
+  if (!moreEl) return;
+  moreEl.textContent = "";
+  if (!curMore || renderedCount >= curTotal) return;
+  const btn = document.createElement("button");
+  btn.className = "loadmore";
+  btn.textContent = loadingMore ? "Loading…" : `Load more (${curTotal - renderedCount} more)`;
+  btn.disabled = loadingMore;
+  btn.addEventListener("click", loadMore);
+  moreEl.appendChild(btn);
+}
+
+function extractResult(r: any): ResultData | null {
+  if (!r) return null;
+  if (r.structuredContent) return r.structuredContent;
+  if (r.tracks) return r;
+  if (r.result && r.result.structuredContent) return r.result.structuredContent;
+  return null;
+}
+
+function callTool(name: string, args: Record<string, unknown>): Promise<ResultData | null> {
+  const oa: any = (window as any).openai;
+  if (oa && typeof oa.callTool === "function") {
+    return Promise.resolve(oa.callTool(name, args)).then(extractResult);
+  }
+  if (appInstance && typeof appInstance.callServerTool === "function") {
+    return appInstance.callServerTool({ name, arguments: args }).then(extractResult);
+  }
+  return Promise.reject(new Error("no callTool bridge"));
+}
+
+function loadMore(): void {
+  if (!curMore || loadingMore) return;
+  const myGen = gen;
+  loadingMore = true;
+  renderLoadMore();
+  const args = Object.assign({}, curMore.args, { offset: renderedCount });
+  callTool(curMore.tool, args)
+    .then((data) => {
+      if (myGen !== gen) return; // widget was re-rendered; abandon this stale result
+      loadingMore = false;
+      if (!data) {
+        // Null = error / unrecognized shape: keep curMore so the button stays for a retry.
+        renderLoadMore();
+        return;
+      }
+      // Valid response (even an empty end-of-list page): trust its more/total.
+      const tracks = data.tracks || [];
+      appendRows(tracks);
+      renderedCount += tracks.length;
+      if (typeof data.total === "number") curTotal = data.total;
+      curMore = data.more || null;
+      renderLoadMore();
+    })
+    .catch(() => {
+      if (myGen !== gen) return;
+      loadingMore = false;
+      renderLoadMore();
+    });
+}
+
+function render(data: ResultData | null | undefined): void {
   const tracks = (data && data.tracks) || [];
   if (!tracks.length) return;
   rendered = true;
+  // New render generation: invalidates any in-flight Load more and clears the
+  // loading flag so a stale request can't append foreign rows or stick the button.
+  gen++;
+  loadingMore = false;
 
   const a = audioEl();
   a.pause();
@@ -337,22 +444,20 @@ function render(data: { query?: string; tracks?: UiTrack[] } | null | undefined)
   pendingSeek = null;
 
   const head = document.getElementById("head");
-  if (head) {
-    head.textContent =
-      data && data.query
-        ? `Free To Use — ${tracks.length} result${tracks.length > 1 ? "s" : ""} for "${data.query}"`
-        : `Free To Use — ${tracks.length} track${tracks.length > 1 ? "s" : ""}`;
-  }
+  if (head) head.textContent = (data && data.heading) || "Free To Use";
 
   const list = document.getElementById("list");
   if (!list) return;
   list.textContent = "";
-  rows = tracks.map((t) => {
-    const st = buildRow(t);
-    list.appendChild(st.el);
-    return st;
-  });
+  rows = [];
+  appendRows(tracks);
+
+  curTotal = data && typeof data.total === "number" ? data.total : tracks.length;
+  renderedCount = ((data && data.offset) || 0) + tracks.length;
+  curMore = (data && data.more) || null;
+
   wireAudioOnce();
+  renderLoadMore();
 }
 
 function init(): void {
