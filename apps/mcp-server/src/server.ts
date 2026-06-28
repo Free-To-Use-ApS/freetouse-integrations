@@ -35,24 +35,21 @@ const WIDGET_URI = `ui://widget/results-${WIDGET_VERSION}.html`;
 // and the Nunito font load under strict CSP, and ChatGPT recognizes the policy.
 const WIDGET_META = {
   ui: {
-    // resourceDomains maps to img-src/script-src/style-src/font-src/media-src.
+    // resourceDomains -> img-src/style-src/font-src/media-src. data.freetouse.com
+    // serves cover art + audio; "data:" allows the embedded base64 Nunito font.
     csp: {
-      resourceDomains: [
-        "https://data.freetouse.com",
-        "https://fonts.googleapis.com",
-        "https://fonts.gstatic.com",
-      ],
+      resourceDomains: ["https://data.freetouse.com", "data:"],
       connectDomains: ["https://data.freetouse.com"],
     },
   },
+  // ChatGPT-specific: declaring widgetCSP + widgetDomain is what ChatGPT reads to
+  // recognize the policy (the "CSP off" dev-mode badge). For an inline-served
+  // widget the domain is chatgpt.com (per OpenAI's Apps SDK guidance).
   "openai/widgetCSP": {
     connect_domains: ["https://data.freetouse.com"],
-    resource_domains: [
-      "https://data.freetouse.com",
-      "https://fonts.googleapis.com",
-      "https://fonts.gstatic.com",
-    ],
+    resource_domains: ["https://data.freetouse.com", "data:"],
   },
+  "openai/widgetDomain": "https://chatgpt.com",
 };
 
 function widgetContents(uri: string) {

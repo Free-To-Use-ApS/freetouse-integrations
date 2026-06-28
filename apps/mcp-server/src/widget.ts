@@ -15,10 +15,11 @@ const CSS = `
   :root {
     --ftu-primary: #7569de;
     --ftu-primary-hover: #635ecc;
+    --ftu-secondary: #383838;
     --ftu-light-grey: #d1d1d1;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1d1d1f; }
+  body { margin: 0; font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ftu-secondary); }
   .head { font-size: 13px; color: #8a8a8a; font-weight: 600; padding: 8px 4px 10px; }
   .list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -31,8 +32,8 @@ const CSS = `
   .vdiv { width: 1px; align-self: stretch; background: #ededed; flex: none; margin: 5px 0; }
 
   .meta { width: 108px; flex: none; min-width: 0; }
-  .title { font-weight: 800; font-size: 14px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .artist { font-weight: 600; font-size: 12.5px; color: #9a9a9a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+  .title { font-weight: 800; font-size: 14px; line-height: 1.25; color: var(--ftu-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .artist { font-weight: 400; font-size: 11px; color: var(--ftu-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
 
   .chips { width: 76px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; }
   .chip { max-width: 100%; font-size: 10.5px; font-weight: 400; color: #7a7a7a; background: #f2f2f4; border-radius: 999px; padding: 4px 10px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
