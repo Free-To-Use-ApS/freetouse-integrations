@@ -45,10 +45,12 @@ export interface UiTrack {
 
 interface IndexEntry extends UiTrack {
   downloads: number;
-  /** Lowercased tag + category names, for high-weight matching */
+  /** Lowercased fields, kept separate so a title/artist hit can outrank a tag hit. */
+  titleLc: string;
+  artistLc: string;
+  genreLc: string;
+  /** Lowercased tag + category names. */
   tagcat: string;
-  /** Lowercased title + artist + genre, for low-weight matching */
-  text: string;
 }
 
 export const MAX_RESULTS = 12;
@@ -164,8 +166,10 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     peaks: downsamplePeaks(t.waveform, WAVE_BARS),
     chips,
     downloads: t.downloads ?? 0,
+    titleLc: t.title.toLowerCase(),
+    artistLc: artist.toLowerCase(),
+    genreLc: (t.genre ?? "").toLowerCase(),
     tagcat: [...tags, ...cats].join(" ").toLowerCase(),
-    text: [t.title, artist, t.genre ?? ""].join(" ").toLowerCase(),
   };
 }
 
@@ -231,14 +235,18 @@ function terms(query: string): string[] {
 function score(entry: IndexEntry, ts: string[]): number {
   let s = 0;
   for (const t of ts) {
-    if (entry.tagcat.includes(t)) s += 3; // tag / category match (strong signal)
-    else if (entry.text.includes(t)) s += 1; // title / artist / genre match
+    // Title / artist are the strongest signals (the user named a track or
+    // artist), so they outrank a tag/category match; genre is weakest.
+    if (entry.titleLc.includes(t)) s += 5;
+    else if (entry.artistLc.includes(t)) s += 5;
+    else if (entry.tagcat.includes(t)) s += 3;
+    else if (entry.genreLc.includes(t)) s += 2;
   }
   return s;
 }
 
 function strip(e: IndexEntry): UiTrack {
-  const { downloads: _d, tagcat: _tc, text: _t, ...ui } = e;
+  const { downloads: _d, tagcat: _tc, titleLc: _t, artistLc: _a, genreLc: _g, ...ui } = e;
   return ui;
 }
 

@@ -119,16 +119,25 @@ function buildServer(): McpServer {
     {
       title: "Search Free To Use music",
       description:
-        "Find royalty-free Free To Use music tracks by mood, genre, activity, or vibe " +
-        '(e.g. "calm piano for studying", "energetic workout", "cinematic trailer", "lofi"). ' +
-        "Returns tracks with tags, a short description, and a listen/download link. " +
-        "Use whenever the user wants background music for videos, streams, podcasts, or other content.",
+        "Find royalty-free Free To Use music and present it to the user. The tracks " +
+        "returned are shown directly to the user as interactive players (cover, " +
+        "waveform, play, download), so the result of ONE call IS your answer — make " +
+        "that single call return exactly the tracks the user should see. " +
+        "Put the user's request straight into the query: an artist name (e.g. " +
+        '"Pufino"), a specific track title (e.g. "Magnificent"), or a mood/genre/' +
+        'activity (e.g. "calm piano", "energetic workout", "lofi"). Set limit to how ' +
+        "many they asked for. Avoid a broad search followed by re-listing a different " +
+        "subset in text — instead search precisely so the players show the right " +
+        "tracks. Use whenever the user wants background music for videos, streams, " +
+        "podcasts, or other content.",
       annotations: { readOnlyHint: true, openWorldHint: true },
       inputSchema: {
         query: z
           .string()
           .describe(
-            'What kind of music to find: a mood, genre, activity, or vibe. E.g. "upbeat corporate", "sad piano", "lofi study". Leave empty for staff-picked popular tracks.',
+            'What to find — an artist name ("Pufino"), a track title ("Magnificent"), ' +
+              'or a mood/genre/activity ("upbeat corporate", "sad piano", "lofi study"). ' +
+              "Title and artist matches rank first. Leave empty for staff-picked popular tracks.",
           ),
         limit: z
           .number()
