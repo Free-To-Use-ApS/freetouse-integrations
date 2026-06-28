@@ -20,6 +20,8 @@ const CSS = `
   }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ftu-secondary); }
+  /* Force Nunito with high specificity in case the host injects its own font. */
+  .head, .title, .artist, .chip, .dur { font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
   .head { font-size: 13px; color: #8a8a8a; font-weight: 600; padding: 8px 4px 10px; }
   .list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -64,7 +66,7 @@ const CSS = `
     }
   }
 
-  .dur { flex: none; font-size: 9px; font-weight: 400; color: #8a8a8a; background: #f4f4f6; border-radius: 5px; padding: 2px 5px; font-variant-numeric: tabular-nums; }
+  .dur { flex: none; font-size: 9px; font-weight: 400; color: #8a8a8a; background: #f4f4f6; border-radius: 6px; padding: 3px 7px; font-variant-numeric: tabular-nums; }
   .dl { flex: none; width: 34px; height: 34px; border: none; background: none; color: #9a9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
   .dl svg { width: 22px; height: 22px; fill: currentColor; }
   .dl:hover { color: var(--ftu-primary-hover); }
