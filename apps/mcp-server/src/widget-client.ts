@@ -126,7 +126,17 @@ function wireAudioOnce(): void {
   const a = audioEl();
   a.addEventListener("play", () => { if (active) setRowPlaying(active, true); });
   a.addEventListener("pause", () => { if (active) setRowPlaying(active, false); });
-  a.addEventListener("ended", () => { if (active) { setRowPlaying(active, false); resetRow(active); } });
+  a.addEventListener("ended", () => {
+    const cur = active;
+    if (!cur) return;
+    setRowPlaying(cur, false);
+    resetRow(cur);
+    // Auto-advance to the next track in the batch (if any).
+    const idx = rows.indexOf(cur);
+    active = null;
+    const next = idx >= 0 ? rows[idx + 1] : null;
+    if (next) playTrack(next);
+  });
   a.addEventListener("loadedmetadata", () => {
     if (active && pendingSeek != null && a.duration) {
       a.currentTime = pendingSeek * a.duration;

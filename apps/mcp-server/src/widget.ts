@@ -1,19 +1,17 @@
 import { readFileSync } from "node:fs";
+import { FONT_CSS } from "./fonts.js";
 
 // Static shell + styling for the results widget — a list of Free To Use
 // mini-players matching freetouse.com (flush cover, title/artist, centered tag
 // pills, play, symmetric waveform scrubber, duration, download). Interactive
 // logic lives in widget-client.ts (bundled by esbuild, inlined below).
 // The .ftu-wave / .ftu-wave-bar rules mirror packages/ftu-style waveform.css.
-const FONT_LINKS =
-  '<link rel="preconnect" href="https://fonts.googleapis.com" />' +
-  '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />' +
-  '<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />';
 
-// @import is repeated here (first rule) because some host iframes strip <link>
-// tags but keep inline <style>; one of the two reliably loads Nunito.
+// Nunito is embedded (base64 @font-face in FONT_CSS) rather than linked, because
+// host iframes (ChatGPT) strip external <link>/@import — embedding is the only
+// way the brand font reliably loads.
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+  ${FONT_CSS}
   :root {
     --ftu-primary: #7569de;
     --ftu-primary-hover: #635ecc;
@@ -65,7 +63,7 @@ const CSS = `
     }
   }
 
-  .dur { flex: none; font-size: 10.5px; font-weight: 400; color: #8a8a8a; background: #f4f4f6; border-radius: 8px; padding: 4px 9px; font-variant-numeric: tabular-nums; }
+  .dur { flex: none; font-size: 9px; font-weight: 400; color: #8a8a8a; background: #f4f4f6; border-radius: 5px; padding: 2px 5px; font-variant-numeric: tabular-nums; }
   .dl { flex: none; width: 34px; height: 34px; border: none; background: none; color: #9a9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
   .dl svg { width: 22px; height: 22px; fill: currentColor; }
   .dl:hover { color: var(--ftu-primary-hover); }
@@ -89,7 +87,6 @@ export function buildWidgetHtml(): string {
   return (
     `<!doctype html><html><head><meta charset="utf-8" />` +
     `<meta name="viewport" content="width=device-width, initial-scale=1" />` +
-    FONT_LINKS +
     `<style>${CSS}</style></head><body>${BODY}<script>${js}</script></body></html>`
   );
 }
