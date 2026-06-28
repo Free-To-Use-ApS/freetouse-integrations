@@ -185,7 +185,7 @@ function seek(state: RowState, frac: number): void {
 
 function download(track: UiTrack): void {
   if (!track.mp3) return;
-  const name = `${track.artist || "Free To Use"} - ${track.title || "track"}.mp3`;
+  const name = `${track.artist || "Free To Use"} - ${track.title || "track"} (freetouse.com).mp3`;
   if (appInstance && appInstance.downloadFile) {
     appInstance
       .downloadFile({ contents: [{ type: "resource_link", uri: track.mp3, name, mimeType: "audio/mpeg" }] })

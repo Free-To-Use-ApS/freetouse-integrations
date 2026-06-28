@@ -41,7 +41,7 @@ const CSS = `
 
   /* The play/pause SVGs include their own circle + colour (grey idle, purple
      playing), so the button is just a sizing wrapper. */
-  .play { flex: none; width: 32px; height: 32px; border: none; background: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .play { flex: none; width: 28px; height: 28px; border: none; background: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .play svg { width: 100%; height: 100%; display: block; }
   .play:hover { filter: brightness(0.97); }
 
