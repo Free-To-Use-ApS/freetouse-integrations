@@ -490,7 +490,7 @@ shared with third parties.</p>
 <p>We do not sell or share any data. The only external service the connector
 contacts is the Free To Use API to fulfil your music searches.</p>
 <h2>Contact</h2>
-<p>Questions? Contact <a href="mailto:privacy@freetouse.com">privacy@freetouse.com</a>
+<p>Questions? Contact <a href="mailto:hello@freetouse.com">hello@freetouse.com</a>
 or visit <a href="https://freetouse.com">freetouse.com</a>.</p>
 </body></html>`;
 
