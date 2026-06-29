@@ -361,10 +361,15 @@ function buildRow(track: UiTrack): RowState {
   body.appendChild(durEl);
   body.appendChild(vdiv());
   body.appendChild(dlBtn);
-  el.appendChild(cover);
-  el.appendChild(body);
-  // Premium tracks get a bookmark-star overlaid in the card's upper-right corner
-  // (matching freetouse.com), with a "Premium Track" hover tooltip.
+  // The framed/clipped card. The badge lives outside it (directly on .player) so
+  // it can poke slightly above the top edge without being clipped.
+  const clip = document.createElement("div");
+  clip.className = "player-clip";
+  clip.appendChild(cover);
+  clip.appendChild(body);
+  el.appendChild(clip);
+  // Premium tracks get a bookmark-star in the card's upper-right corner, poking
+  // slightly above the frame (matching freetouse.com), with a "Premium Track" tooltip.
   if (track.premium) {
     const star = document.createElement("span");
     star.className = "premium-badge";
