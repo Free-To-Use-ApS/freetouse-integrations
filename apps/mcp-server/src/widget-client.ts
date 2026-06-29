@@ -59,6 +59,11 @@ const DL =
   '<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"></path>' +
   '<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"></path>' +
   "</svg>";
+// Bootstrap Icons "bookmark-star-fill" — premium indicator (matches freetouse.com).
+const PREMIUM =
+  '<svg viewBox="0 0 16 16">' +
+  '<path fill-rule="evenodd" d="M2 15.5V2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.74.439L8 13.069l-5.26 2.87A.5.5 0 0 1 2 15.5M8.16 4.1a.178.178 0 0 0-.32 0l-.634 1.285a.18.18 0 0 1-.134.098l-1.42.206a.178.178 0 0 0-.098.303L6.58 7.286a.18.18 0 0 1 .051.158L6.3 8.858a.178.178 0 0 0 .258.187l1.27-.668a.18.18 0 0 1 .165 0l1.27.668a.178.178 0 0 0 .257-.187L9.27 7.444a.18.18 0 0 1 .05-.158l1.028-1.001a.178.178 0 0 0-.098-.303l-1.42-.206a.18.18 0 0 1-.134-.098z"></path>' +
+  "</svg>";
 
 const DEFAULT_PEAKS: number[] = Array.from({ length: 80 }, (_v, i) =>
   22 + Math.round(45 * Math.abs(Math.sin(i / 3.5))),
@@ -260,19 +265,12 @@ function buildRow(track: UiTrack): RowState {
   meta.appendChild(artist);
 
   // First two tags/categories as pills (like freetouse.com), in their own column.
-  // Premium tracks get an amber "Premium" pill first.
   const chipList = track.chips && track.chips.length ? track.chips : track.tags || [];
   let chipsEl: any = null;
-  if (track.premium || chipList.length) {
+  if (chipList.length) {
     chipsEl = document.createElement("div");
     chipsEl.className = "chips";
-    if (track.premium) {
-      const p = document.createElement("span");
-      p.className = "chip premium";
-      p.textContent = "Premium";
-      chipsEl.appendChild(p);
-    }
-    chipList.slice(0, track.premium ? 1 : 2).forEach((c) => {
+    chipList.slice(0, 2).forEach((c) => {
       const s = document.createElement("span");
       s.className = "chip";
       s.textContent = c;
@@ -326,6 +324,15 @@ function buildRow(track: UiTrack): RowState {
   body.appendChild(waveEl);
   body.appendChild(durEl);
   body.appendChild(vdiv());
+  // Premium indicator (bookmark-star) sits just before the download, like FTU.
+  if (track.premium) {
+    const star = document.createElement("span");
+    star.className = "premium-badge";
+    star.innerHTML = PREMIUM;
+    star.title = "Premium track";
+    star.setAttribute("aria-label", "Premium track");
+    body.appendChild(star);
+  }
   body.appendChild(dlBtn);
   el.appendChild(cover);
   el.appendChild(body);

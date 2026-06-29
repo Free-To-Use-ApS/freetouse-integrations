@@ -266,10 +266,11 @@ const STOPWORDS = new Set([
 // (rather than a flat list) lets score() credit each word once even when the word
 // and its stem both match — avoids inflating tracks that contain the longer form.
 function terms(query: string): string[][] {
-  const raw = query
+  const raw = (query ?? "")
     .toLowerCase()
+    .replace(/-/g, "") // "lo-fi" -> "lofi"; avoids noisy 2-char "lo"/"fi" substring matches
     .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
+    .filter((w) => w.length >= 3 && !STOPWORDS.has(w));
   const groups: string[][] = [];
   const seen = new Set<string>();
   for (const w of raw) {

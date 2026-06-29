@@ -218,8 +218,10 @@ function buildServer(): McpServer {
         "return exactly the tracks the user should see. Put the request straight into " +
         'the query: a mood/genre/activity ("calm piano", "energetic workout", "lofi"), ' +
         'an artist ("Pufino"), or a track title ("Magnificent"). Title/artist matches ' +
-        "rank first. For 'more like this' use find_similar; to browse a genre/mood use " +
-        "browse_category; for an artist's catalog use browse_artist.",
+        "rank first. Keep the query CONCISE — 1-3 words capturing the core request; do " +
+        'NOT pad it with many synonyms (e.g. use "lofi", not "lo-fi lofi chill study hip ' +
+        'hop"), as extra terms broaden the results. For \'more like this\' use find_similar; ' +
+        "to browse a genre/mood use browse_category; for an artist's catalog use browse_artist.",
       annotations: trackAnnotations,
       inputSchema: {
         query: z
