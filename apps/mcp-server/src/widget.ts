@@ -47,7 +47,7 @@ const CSS = `
      slightly ABOVE the frame (like freetouse.com). It sits clear above the download
      button so it never blocks the button, and stays hoverable for the "Premium
      Track" tooltip (hence no pointer-events:none). */
-  .premium-badge { position: absolute; top: -5px; right: 8px; z-index: 2; display: flex; align-items: center; line-height: 0; color: var(--ftu-primary); cursor: default; }
+  .premium-badge { position: absolute; top: -3px; right: 8px; z-index: 2; display: flex; align-items: center; line-height: 0; color: var(--ftu-primary); cursor: default; }
   .premium-badge svg { width: 16px; height: 16px; fill: currentColor; }
 
   .more { display: flex; justify-content: center; padding: 4px 0 2px; }
@@ -82,7 +82,7 @@ const CSS = `
   }
 
   .dur { flex: none; font-size: 9px; font-weight: 400; color: #8a8a8a; background: #f4f4f6; border-radius: 6px; padding: 3px 7px; font-variant-numeric: tabular-nums; }
-  .dl { flex: none; width: 34px; height: 34px; border: none; background: none; color: #9a9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .dl { flex: none; width: 34px; height: 34px; margin: 0 4px; border: none; background: none; color: #9a9a9a; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
   .dl svg { width: 22px; height: 22px; fill: currentColor; }
   .dl:hover { color: var(--ftu-primary-hover); }
 `;
