@@ -50,10 +50,12 @@ const CSS = `
   .premium-badge { position: absolute; top: -1.5px; right: 8px; z-index: 2; display: flex; align-items: center; line-height: 0; color: var(--ftu-primary); cursor: default; }
   .premium-badge svg { width: 16px; height: 16px; fill: currentColor; }
 
-  .more { display: flex; justify-content: center; padding: 4px 0 2px; }
-  .loadmore { font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ftu-primary); background: #f2f2f7; border: none; border-radius: 999px; padding: 8px 18px; cursor: pointer; }
-  .loadmore:hover { background: #ececf3; }
-  .loadmore:disabled { opacity: .6; cursor: default; }
+  /* Load more echoes the player cards: white, hairline border, soft shadow,
+     brand-purple label — with generous breathing room below the list. */
+  .more { display: flex; justify-content: center; padding: 14px 0 18px; }
+  .loadmore { font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--ftu-primary); background: #fff; border: 1px solid #ededed; border-radius: 12px; padding: 10px 24px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+  .loadmore:hover { background: #faf9ff; border-color: #d8d2f6; box-shadow: 0 2px 7px rgba(117,105,222,.13); }
+  .loadmore:disabled { opacity: .6; cursor: default; box-shadow: none; }
 
   /* The play/pause SVGs include their own circle + colour (grey idle, purple
      playing), so the button is just a sizing wrapper. */

@@ -45,6 +45,8 @@ interface RowState {
   durEl: any;
   playBtn: any;
   idx: number; // index of last "played" bar (-1 = none)
+  resumeTime: number; // audio currentTime (s) to resume from when replayed
+  completed: boolean; // played through to the end (replays from the start)
 }
 
 // Free To Use brand play/pause buttons (full circle + glyph baked in): grey
@@ -115,6 +117,8 @@ let appInstance: any = null;
 let rows: RowState[] = [];
 let active: RowState | null = null;
 let pendingSeek: number | null = null;
+// currentTime (s) to seek to once the next track's metadata loads (resume point).
+let pendingResume: number | null = null;
 let rendered = false;
 let audioWired = false;
 
@@ -177,6 +181,13 @@ function resetRow(state: RowState): void {
   state.durEl.textContent = fmt(state.track.duration);
 }
 
+// Mark a whole row played (every bar purple) — used when a track finishes so it
+// stays filled, showing the user they've already listened to it.
+function fillAll(state: RowState): void {
+  for (let i = 0; i < state.bars.length; i++) state.bars[i].dataset.played = "true";
+  state.idx = state.bars.length - 1;
+}
+
 function setRowPlaying(state: RowState, playing: boolean): void {
   state.playBtn.innerHTML = playing ? PAUSE : PLAY;
   state.playBtn.classList.toggle("playing", playing);
@@ -190,22 +201,44 @@ function wireAudioOnce(): void {
   audioWired = true;
   const a = audioEl();
   a.addEventListener("play", () => { if (active) setRowPlaying(active, true); });
-  a.addEventListener("pause", () => { if (active) setRowPlaying(active, false); });
+  a.addEventListener("pause", () => {
+    if (!active) return;
+    // Remember where we paused so this track can resume there if replayed later.
+    if (isFinite(a.currentTime) && a.currentTime > 0) active.resumeTime = a.currentTime;
+    setRowPlaying(active, false);
+  });
   a.addEventListener("ended", () => {
     const cur = active;
     if (!cur) return;
     setRowPlaying(cur, false);
-    resetRow(cur);
-    // Auto-advance to the next track in the batch (if any).
+    // Keep the bars filled so the user sees this track was played; replay starts
+    // from the beginning (handled in playTrack via the `completed` flag).
+    fillAll(cur);
+    cur.completed = true;
+    cur.resumeTime = 0;
+    // Auto-advance to the next track in the batch (if any), always from its
+    // start — resume only applies to an explicit play press, so clear any prior
+    // resume point / leftover fill the next track may carry.
     const idx = rows.indexOf(cur);
     active = null;
     const next = idx >= 0 ? rows[idx + 1] : null;
-    if (next) playTrack(next);
+    if (next) {
+      resetRow(next);
+      next.resumeTime = 0;
+      next.completed = false;
+      playTrack(next);
+    }
   });
   a.addEventListener("loadedmetadata", () => {
-    if (active && pendingSeek != null && a.duration) {
+    if (!active || !a.duration) return;
+    // A click-to-seek position takes priority over a resume point.
+    if (pendingSeek != null) {
       a.currentTime = pendingSeek * a.duration;
       pendingSeek = null;
+      pendingResume = null;
+    } else if (pendingResume != null) {
+      a.currentTime = Math.min(pendingResume, a.duration);
+      pendingResume = null;
     }
   });
   a.addEventListener("timeupdate", () => {
@@ -220,9 +253,22 @@ function playTrack(state: RowState): void {
     else a.pause();
     return;
   }
-  if (active) { resetRow(active); setRowPlaying(active, false); }
+  // Leaving the current track: remember its position and KEEP its fill purple, so
+  // the user can see what they've played and resume it later.
+  if (active) {
+    if (isFinite(a.currentTime) && a.currentTime > 0) active.resumeTime = a.currentTime;
+    setRowPlaying(active, false);
+  }
   active = state;
   pendingSeek = null;
+  // A finished track replays from the start (clear its fill); otherwise resume
+  // from where it last left off once the new track's metadata loads.
+  if (state.completed) {
+    resetRow(state);
+    state.completed = false;
+    state.resumeTime = 0;
+  }
+  pendingResume = state.resumeTime > 0 ? state.resumeTime : null;
   a.src = state.track.mp3 || "";
   a.volume = typeof state.track.gain === "number" ? state.track.gain : 1;
   a.play().catch(() => {});
@@ -242,6 +288,7 @@ function fractionFromX(el: any, clientX: number): number {
 function seek(state: RowState, frac: number): void {
   if (active !== state) {
     playTrack(state);
+    pendingResume = null; // an explicit click position overrides the resume point
     pendingSeek = frac;
     setProgress(state, frac);
     return;
@@ -379,7 +426,7 @@ function buildRow(track: UiTrack): RowState {
     el.appendChild(star);
   }
 
-  const state: RowState = { track, el, bars, durEl, playBtn, idx: -1 };
+  const state: RowState = { track, el, bars, durEl, playBtn, idx: -1, resumeTime: 0, completed: false };
 
   playBtn.addEventListener("click", () => playTrack(state));
   dlBtn.addEventListener("click", () => download(track));
