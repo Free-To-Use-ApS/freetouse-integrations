@@ -47,7 +47,7 @@ const CSS = `
      slightly ABOVE the frame (like freetouse.com). It sits clear above the download
      button so it never blocks the button, and stays hoverable for the "Premium
      Track" tooltip (hence no pointer-events:none). */
-  .premium-badge { position: absolute; top: -3px; right: 8px; z-index: 2; display: flex; align-items: center; line-height: 0; color: var(--ftu-primary); cursor: default; }
+  .premium-badge { position: absolute; top: -1.5px; right: 8px; z-index: 2; display: flex; align-items: center; line-height: 0; color: var(--ftu-primary); cursor: default; }
   .premium-badge svg { width: 16px; height: 16px; fill: currentColor; }
 
   .more { display: flex; justify-content: center; padding: 4px 0 2px; }
