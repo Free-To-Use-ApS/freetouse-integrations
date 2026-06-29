@@ -43,6 +43,12 @@ const CSS = `
 
   .chips { width: 76px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; }
   .chip { max-width: 100%; font-size: 10.5px; font-weight: 400; color: #7a7a7a; background: #f2f2f4; border-radius: 999px; padding: 4px 10px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Cover, title, artist and chips link to freetouse.com (handled in JS). */
+  .lnk { cursor: pointer; }
+  .cover.lnk:hover { opacity: .9; }
+  .title.lnk:hover, .artist.lnk:hover { text-decoration: underline; }
+  .chip.lnk:hover { background: #e6e6ec; color: #5f5f5f; }
   /* Premium indicator: a bookmark-star in the card's upper-right corner that pokes
      slightly ABOVE the frame (like freetouse.com). It sits clear above the download
      button so it never blocks the button, and stays hoverable for the "Premium
@@ -50,12 +56,12 @@ const CSS = `
   .premium-badge { position: absolute; top: -1.5px; right: 8px; z-index: 2; display: flex; align-items: center; line-height: 0; color: var(--ftu-primary); cursor: default; }
   .premium-badge svg { width: 16px; height: 16px; fill: currentColor; }
 
-  /* Load more echoes the player cards: white, hairline border, soft shadow,
-     brand-purple label — with generous breathing room below the list. */
-  .more { display: flex; justify-content: center; padding: 14px 0 18px; }
-  .loadmore { font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--ftu-primary); background: #fff; border: 1px solid #ededed; border-radius: 12px; padding: 10px 24px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
-  .loadmore:hover { background: #faf9ff; border-color: #d8d2f6; box-shadow: 0 2px 7px rgba(117,105,222,.13); }
-  .loadmore:disabled { opacity: .6; cursor: default; box-shadow: none; }
+  /* Load more: a small, neutral (near-black) button tucked into the lower right,
+     echoing the player cards (white, hairline border, soft shadow). */
+  .more { display: flex; justify-content: flex-end; padding: 10px 0 16px; }
+  .loadmore { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ftu-secondary); background: #fff; border: 1px solid #ededed; border-radius: 10px; padding: 7px 16px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: background-color .15s ease, border-color .15s ease; }
+  .loadmore:hover { background: #f6f6f7; border-color: #dcdcdc; }
+  .loadmore:disabled { opacity: .6; cursor: default; }
 
   /* The play/pause SVGs include their own circle + colour (grey idle, purple
      playing), so the button is just a sizing wrapper. */

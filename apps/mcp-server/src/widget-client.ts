@@ -20,12 +20,13 @@ interface UiTrack {
   mp3?: string;
   art?: string;
   url?: string;
+  artistUrl?: string;
   tags?: string[];
   genre?: string | null;
   description?: string;
   gain?: number;
   peaks?: number[];
-  chips?: string[];
+  chips?: { label: string; href: string }[];
   premium?: boolean;
 }
 
@@ -94,8 +95,12 @@ const FALLBACK: ResultData = {
       mp3: "https://data.freetouse.com/music/tracks/4a5a2691-46b7-4624-a1f7-d83914f65c74/file/mp3/file.mp3",
       art: "https://data.freetouse.com/music/tracks/4a5a2691-46b7-4624-a1f7-d83914f65c74/cover/webp/md/cover-md.webp",
       url: "https://freetouse.com/music/massobeats/remedy",
+      artistUrl: "https://freetouse.com/music/massobeats",
       tags: ["chillhop", "dreamy"],
-      chips: ["Lofi", "Chillhop"],
+      chips: [
+        { label: "Lofi", href: "https://freetouse.com/music/category/lofi" },
+        { label: "Chillhop", href: "https://freetouse.com/music/search/chillhop" },
+      ],
       description: "Aesthetic Lofi track with chillhop, dreamy vibes.",
       gain: 0.8,
       peaks: DEFAULT_PEAKS,
@@ -114,6 +119,9 @@ function fmt(sec?: number): string {
 }
 
 let appInstance: any = null;
+// True only once the MCP Apps standard handshake actually completes — so we don't
+// call host-mediated methods (openLink) on an unconnected App (e.g. in /preview).
+let appConnected = false;
 let rows: RowState[] = [];
 let active: RowState | null = null;
 let pendingSeek: number | null = null;
@@ -325,38 +333,80 @@ function fallbackDownload(track: UiTrack): void {
   }
 }
 
+// --- external links (host-mediated) ----------------------------------------
+
+// Open a freetouse.com page (track/artist/category/search). Sandboxed host
+// iframes block plain target=_blank, so route through the host's link API when
+// present (ChatGPT's window.openai.openExternal, or the MCP Apps standard
+// App.openLink), falling back to window.open for the /preview route.
+function openHref(href?: string): void {
+  if (!href) return;
+  const oa: any = (window as any).openai;
+  if (oa && typeof oa.openExternal === "function") {
+    try { oa.openExternal({ href }); return; } catch (_e) {}
+  }
+  if (appConnected && appInstance && typeof appInstance.openLink === "function") {
+    try { appInstance.openLink({ url: href }).catch(() => winOpen(href)); return; } catch (_e) {}
+  }
+  winOpen(href);
+}
+
+function winOpen(href: string): void {
+  try { window.open(href, "_blank", "noopener,noreferrer"); } catch (_e) {}
+}
+
+// Wire an element to open a freetouse.com link on click (cursor handled in CSS).
+function linkTo(el: any, href?: string): void {
+  if (!href) return;
+  el.addEventListener("click", (e: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openHref(href);
+  });
+}
+
 // --- rendering --------------------------------------------------------------
 
 function buildRow(track: UiTrack): RowState {
   const el = document.createElement("div");
   el.className = "player";
 
+  // Cover art links to the track page on freetouse.com.
   const cover = document.createElement("img");
   cover.className = "cover";
   cover.alt = "";
   if (track.art) cover.src = track.art;
+  if (track.url) { cover.classList.add("lnk"); cover.title = track.title || ""; linkTo(cover, track.url); }
 
   const meta = document.createElement("div");
   meta.className = "meta";
+  // Title -> track page; artist -> artist page.
   const title = document.createElement("div");
   title.className = "title";
   title.textContent = track.title || "Untitled";
+  if (track.url) { title.classList.add("lnk"); linkTo(title, track.url); }
   const artist = document.createElement("div");
   artist.className = "artist";
   artist.textContent = track.artist || "";
+  if (track.artistUrl) { artist.classList.add("lnk"); linkTo(artist, track.artistUrl); }
   meta.appendChild(title);
   meta.appendChild(artist);
 
   // First two tags/categories as pills (like freetouse.com), in their own column.
-  const chipList = track.chips && track.chips.length ? track.chips : track.tags || [];
+  // Each pill links to its freetouse.com page (category page or tag search).
+  const chipList = (track.chips && track.chips.length
+    ? track.chips
+    : (track.tags || []).map((t) => ({ label: t, href: "" }))
+  ).slice(0, 2);
   let chipsEl: any = null;
   if (chipList.length) {
     chipsEl = document.createElement("div");
     chipsEl.className = "chips";
-    chipList.slice(0, 2).forEach((c) => {
+    chipList.forEach((c) => {
       const s = document.createElement("span");
       s.className = "chip";
-      s.textContent = c;
+      s.textContent = c.label;
+      if (c.href) { s.classList.add("lnk"); linkTo(s, c.href); }
       chipsEl.appendChild(s);
     });
   }
@@ -469,7 +519,7 @@ function renderLoadMore(): void {
   if (!curMore || renderedCount >= curTotal) return;
   const btn = document.createElement("button");
   btn.className = "loadmore";
-  btn.textContent = loadingMore ? "Loading…" : `Load more (${curTotal - renderedCount} more)`;
+  btn.textContent = loadingMore ? "Loading…" : "Load more";
   btn.disabled = loadingMore;
   btn.addEventListener("click", loadMore);
   moreEl.appendChild(btn);
@@ -578,7 +628,7 @@ function init(): void {
       if (sc && sc.tracks) render(sc);
     };
     const c = appInstance.connect && appInstance.connect();
-    if (c && c.catch) c.catch(() => {});
+    if (c && c.then) c.then(() => { appConnected = true; }).catch(() => {});
   } catch (_e) {
     /* not inside a standard MCP Apps host */
   }

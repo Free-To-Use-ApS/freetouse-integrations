@@ -28,6 +28,8 @@ export interface UiTrack {
   art: string;
   /** Listen & download page on freetouse.com */
   url: string;
+  /** Artist page on freetouse.com (the first/primary artist). */
+  artistUrl: string;
   /** First few tags (real metadata) */
   tags: string[];
   genre: string | null;
@@ -37,8 +39,12 @@ export interface UiTrack {
   gain: number;
   /** Downsampled loudness bars (0-100) for the waveform scrubber. */
   peaks: number[];
-  /** First two tags/categories, capitalized — shown as pills. */
-  chips: string[];
+  /**
+   * First two tags/categories, capitalized — shown as pills. Each links to its
+   * freetouse.com page: a category to /music/category/<slug>, a free-form tag to
+   * the search page /music/search/<slug>.
+   */
+  chips: { label: string; href: string }[];
   /** True if the track requires a subscription or single-track license. */
   premium: boolean;
   /** Ready-to-paste credit text (same format as the FTU apps). */
@@ -176,11 +182,21 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
   const cats = (t.categories ?? [])
     .map(([, c]) => (typeof c === "string" ? c : c?.name))
     .filter(Boolean) as string[];
+  // In tags_categories, a category is an object ({id,name}) and a free-form tag
+  // is a plain string — which decides where its pill links on freetouse.com.
   const chips = (t.tags_categories ?? [])
-    .map(([, item]) => (typeof item === "string" ? item : item?.name))
-    .filter(Boolean)
+    .map(([, item]) => ({
+      name: (typeof item === "string" ? item : item?.name) ?? "",
+      isCategory: typeof item !== "string",
+    }))
+    .filter((c) => c.name)
     .slice(0, 2)
-    .map((s) => cap(s as string));
+    .map((c) => ({
+      label: cap(c.name),
+      href: c.isCategory
+        ? `https://freetouse.com/music/category/${slug(c.name)}`
+        : `https://freetouse.com/music/search/${slug(c.name)}`,
+    }));
   return {
     id: t.id,
     title,
@@ -189,6 +205,7 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     mp3: t.files?.mp3 ?? "",
     art: t.thumbnails?.md ?? t.thumbnails?.lg ?? "",
     url: `https://freetouse.com/music/${slug(firstArtist)}/${slug(title)}`,
+    artistUrl: `https://freetouse.com/music/${slug(firstArtist)}`,
     tags: tags.slice(0, 5),
     genre: t.genre,
     description: describe(t.genre, cats, tags, types),
