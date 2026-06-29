@@ -27,7 +27,7 @@ const CSS = `
 
   /* Card. overflow:hidden so the flush cover's left corners clip to the card
      radius while its right corners stay square. */
-  .player { display: flex; align-items: stretch; background: #fff; border: 1px solid #ededed; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  .player { position: relative; display: flex; align-items: stretch; background: #fff; border: 1px solid #ededed; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
   .cover { width: 66px; align-self: stretch; object-fit: cover; background: #f1f1f1; flex: none; }
   .body { flex: 1; display: flex; align-items: center; gap: 11px; padding: 9px 14px; min-width: 0; }
 
@@ -39,8 +39,12 @@ const CSS = `
 
   .chips { width: 76px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; }
   .chip { max-width: 100%; font-size: 10.5px; font-weight: 400; color: #7a7a7a; background: #f2f2f4; border-radius: 999px; padding: 4px 10px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .premium-badge { flex: none; display: flex; align-items: center; color: var(--ftu-primary); cursor: default; }
-  .premium-badge svg { width: 17px; height: 17px; fill: currentColor; }
+  /* Premium indicator: a bookmark-star tucked into the card's upper-right corner
+     (like freetouse.com). Kept in the clear strip ABOVE the download button so it
+     never overlaps the button's click target, while staying hoverable (the
+     "Premium Track" tooltip) — hence no pointer-events:none. */
+  .premium-badge { position: absolute; top: 2px; right: 8px; z-index: 2; display: flex; align-items: center; line-height: 0; color: var(--ftu-primary); cursor: default; }
+  .premium-badge svg { width: 14px; height: 14px; fill: currentColor; }
 
   .more { display: flex; justify-content: center; padding: 4px 0 2px; }
   .loadmore { font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ftu-primary); background: #f2f2f7; border: none; border-radius: 999px; padding: 8px 18px; cursor: pointer; }
@@ -57,7 +61,7 @@ const CSS = `
   .ftu-wave {
     --wave-bg-base: var(--ftu-light-grey);
     --wave-bg-played: var(--ftu-primary);
-    --wave-transition-duration: 450ms;
+    --wave-transition-duration: 480ms;
     flex: 1; min-width: 60px; height: 2.75rem;
     display: flex; align-items: center; justify-content: space-between;
     column-gap: 1px; position: relative; overflow: hidden; cursor: pointer; touch-action: none;

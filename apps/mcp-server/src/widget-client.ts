@@ -69,6 +69,14 @@ const DEFAULT_PEAKS: number[] = Array.from({ length: 80 }, (_v, i) =>
   22 + Math.round(45 * Math.abs(Math.sin(i / 3.5))),
 );
 
+// Waveform fill colours (mirror the CSS --ftu vars). As the playhead crosses each
+// bar we fade it from grey to purple via the Web Animations API rather than rely
+// solely on the CSS transition — some host iframes freeze/strip CSS transitions,
+// so driving the fade in JS makes the "fills in bar by bar" effect reliable.
+const WAVE_BASE = "#d1d1d1";
+const WAVE_PLAYED = "#7569de";
+const WAVE_FADE_MS = 480;
+
 const FALLBACK: ResultData = {
   heading: 'Free To Use — 1 result for "lofi"',
   offset: 0,
@@ -121,6 +129,29 @@ let gen = 0;
 
 // --- waveform fill ----------------------------------------------------------
 
+// Mark a bar played (purple, fading in) or unplayed (grey). The fade is driven by
+// the Web Animations API so it animates even where CSS transitions are frozen;
+// the [data-played] CSS rule still defines the resting colour after the fade.
+function paintBar(bar: any, played: boolean): void {
+  if (!played) {
+    bar.dataset.played = "";
+    // Cancel any in-flight fade so a rewound bar reverts to grey immediately
+    // instead of finishing its grey->purple animation (which sits above the CSS).
+    try { bar.getAnimations().forEach((a: any) => a.cancel()); } catch (_e) {}
+    return;
+  }
+  if (bar.dataset.played === "true") return;
+  bar.dataset.played = "true";
+  try {
+    bar.animate(
+      [{ backgroundColor: WAVE_BASE }, { backgroundColor: WAVE_PLAYED }],
+      { duration: WAVE_FADE_MS, easing: "ease" },
+    );
+  } catch (_e) {
+    /* WAAPI unsupported — the data-played CSS rule still shows the played colour. */
+  }
+}
+
 function setProgress(state: RowState, frac: number): void {
   const n = state.bars.length;
   let idx = Math.floor(frac * n);
@@ -128,15 +159,20 @@ function setProgress(state: RowState, frac: number): void {
   if (idx < -1) idx = -1;
   if (idx === state.idx) return;
   if (idx > state.idx) {
-    for (let i = state.idx + 1; i <= idx; i++) state.bars[i].dataset.played = "true";
+    for (let i = state.idx + 1; i <= idx; i++) paintBar(state.bars[i], true);
   } else {
-    for (let i = state.idx; i > idx; i--) state.bars[i].dataset.played = "";
+    for (let i = state.idx; i > idx; i--) paintBar(state.bars[i], false);
   }
   state.idx = idx;
 }
 
 function resetRow(state: RowState): void {
-  for (let i = 0; i <= state.idx; i++) state.bars[i].dataset.played = "";
+  for (let i = 0; i <= state.idx; i++) {
+    const b = state.bars[i];
+    b.dataset.played = "";
+    // Stop any in-flight fade so the bar snaps cleanly back to grey.
+    try { b.getAnimations().forEach((a: any) => a.cancel()); } catch (_e) {}
+  }
   state.idx = -1;
   state.durEl.textContent = fmt(state.track.duration);
 }
@@ -324,18 +360,19 @@ function buildRow(track: UiTrack): RowState {
   body.appendChild(waveEl);
   body.appendChild(durEl);
   body.appendChild(vdiv());
-  // Premium indicator (bookmark-star) sits just before the download, like FTU.
+  body.appendChild(dlBtn);
+  el.appendChild(cover);
+  el.appendChild(body);
+  // Premium tracks get a bookmark-star overlaid in the card's upper-right corner
+  // (matching freetouse.com), with a "Premium Track" hover tooltip.
   if (track.premium) {
     const star = document.createElement("span");
     star.className = "premium-badge";
     star.innerHTML = PREMIUM;
-    star.title = "Premium track";
-    star.setAttribute("aria-label", "Premium track");
-    body.appendChild(star);
+    star.title = "Premium Track";
+    star.setAttribute("aria-label", "Premium Track");
+    el.appendChild(star);
   }
-  body.appendChild(dlBtn);
-  el.appendChild(cover);
-  el.appendChild(body);
 
   const state: RowState = { track, el, bars, durEl, playBtn, idx: -1 };
 
@@ -467,6 +504,19 @@ function render(data: ResultData | null | undefined): void {
   renderLoadMore();
 }
 
+// ChatGPT exposes results on window.openai.toolOutput, set at mount or a beat
+// after. Render it whenever it appears or changes — guarded so repeated host
+// "globals updated" events don't re-render the same result and reset playback.
+let lastOutput: any = null;
+function renderToolOutput(): void {
+  const oa: any = (window as any).openai;
+  const out = oa && oa.toolOutput;
+  if (out && out.tracks && out !== lastOutput) {
+    lastOutput = out;
+    render(out);
+  }
+}
+
 function init(): void {
   // 1) MCP Apps standard bridge (used for tool results AND host-mediated download).
   try {
@@ -481,14 +531,27 @@ function init(): void {
     /* not inside a standard MCP Apps host */
   }
 
-  // 2) ChatGPT Apps SDK bridge (synchronous toolOutput).
-  const oa: any = (window as any).openai;
-  if (oa && oa.toolOutput && oa.toolOutput.tracks) render(oa.toolOutput);
+  // 2) ChatGPT Apps SDK bridge. toolOutput may be present now or populate just
+  //    after mount, so render it now, on the host's globals event, and via a short
+  //    poll covering the mount race (the event name isn't contractual).
+  renderToolOutput();
+  window.addEventListener("openai:set_globals", renderToolOutput);
+  if ((window as any).openai) {
+    let tries = 0;
+    const poll = setInterval(() => {
+      renderToolOutput();
+      if (rendered || ++tries >= 30) clearInterval(poll); // ~3s safety net
+    }, 100);
+  }
 
-  // 3) Fallback so the widget always renders (e.g. the /preview route).
-  setTimeout(() => {
-    if (!rendered) render(FALLBACK);
-  }, 400);
+  // 3) Demo data — ONLY on the standalone /preview route (flagged by the server).
+  //    In a real host we wait for the actual results rather than flashing a sample
+  //    track, so a search never briefly shows an unrelated track.
+  if ((window as any).__FTU_PREVIEW__) {
+    setTimeout(() => {
+      if (!rendered) render(FALLBACK);
+    }, 150);
+  }
 }
 
 if (document.readyState !== "loading") init();

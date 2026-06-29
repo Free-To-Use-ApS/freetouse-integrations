@@ -501,7 +501,11 @@ app.get("/privacy", (_req: Request, res: Response) => {
 // Convenience route: serve the widget standalone so it can be sanity-checked in
 // a normal browser, outside any host sandbox/CSP.
 app.get("/preview", (_req: Request, res: Response) => {
-  res.type("html").send(WIDGET_HTML);
+  // Flag preview mode so the widget shows its demo track here (and ONLY here);
+  // inside a real host it waits for actual results instead of flashing a sample.
+  res
+    .type("html")
+    .send(WIDGET_HTML.replace("<body>", '<body><script>window.__FTU_PREVIEW__=true;</script>'));
 });
 
 const PORT = Number(process.env.PORT) || 3000;
