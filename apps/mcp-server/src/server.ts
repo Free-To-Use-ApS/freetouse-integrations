@@ -66,6 +66,30 @@ function widgetContents(uri: string) {
 const FRIENDLY_ERROR =
   "Sorry — Free To Use is temporarily unavailable. Please try again in a moment.";
 
+// Connector-level guidance the host shows the model (MCP `initialize` instructions).
+// Two goals: (1) interview briefly to narrow broad requests before searching, and
+// (2) always answer by calling a tool and showing the players — never refuse or
+// invent a catalog size.
+const SERVER_INSTRUCTIONS = [
+  "Free To Use is a public, royalty-free music catalog. These tools return tracks",
+  "as interactive players (cover, waveform, play, download) — the players ARE the",
+  "answer; show them rather than describing tracks in prose.",
+  "",
+  "NARROW BEFORE SEARCHING. When a request is broad or open-ended — a bare genre or",
+  'mood ("lofi", "something chill") or a use-case ("music for a drone video", "a',
+  'wedding", "a podcast intro") — first ask 1-2 short clarifying questions to pin',
+  "down the vibe (mood/energy, tempo, instrumentation, or the kind of scene/video).",
+  "Keep it to one brief message, not an interrogation. Once the user answers (or if",
+  "the request is already specific), call search_music once with a concise refined",
+  "query (a few distinct words like \"calm lofi piano\", not a pile of synonyms) and",
+  "show the results. browse_category lists a whole genre/mood; browse_artist lists",
+  "an artist's catalog; find_similar finds more like a given track.",
+  "",
+  "NEVER refuse to show tracks or say there are 'too many to display' — show the",
+  "first page (results include a total and a Load more control). NEVER invent or",
+  "estimate how many tracks exist; only state a count a tool actually returned.",
+].join("\n");
+
 // Shared, reusable arg schemas for the track tools.
 const limitArg = z
   .number()
@@ -169,7 +193,10 @@ async function run(
 const plural = (n: number, s = "s") => (n === 1 ? "" : s);
 
 function buildServer(): McpServer {
-  const server = new McpServer({ name: "freetouse-music", version: "0.1.0" });
+  const server = new McpServer(
+    { name: "freetouse-music", version: "0.1.0" },
+    { instructions: SERVER_INSTRUCTIONS },
+  );
 
   // The results widget, served as an MCP Apps UI resource at the current
   // content-hashed URI (listed + normalized for hosts).
@@ -220,8 +247,12 @@ function buildServer(): McpServer {
         'an artist ("Pufino"), or a track title ("Magnificent"). Title/artist matches ' +
         "rank first. Keep the query CONCISE — 1-3 words capturing the core request; do " +
         'NOT pad it with many synonyms (e.g. use "lofi", not "lo-fi lofi chill study hip ' +
-        'hop"), as extra terms broaden the results. For \'more like this\' use find_similar; ' +
-        "to browse a genre/mood use browse_category; for an artist's catalog use browse_artist.",
+        'hop"), as extra terms broaden the results. If the request is broad (a bare ' +
+        "genre/mood, or a use-case like a drone video or wedding), ask the user 1-2 quick " +
+        "clarifying questions to narrow the vibe BEFORE calling this. Present the returned " +
+        "players as your answer — never reply that there are too many to show, and never " +
+        "invent a track count. For 'more like this' use find_similar; to browse a genre/mood " +
+        "use browse_category; for an artist's catalog use browse_artist.",
       annotations: trackAnnotations,
       inputSchema: {
         query: z
