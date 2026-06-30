@@ -72,6 +72,13 @@ const PREMIUM =
   '<svg viewBox="0 0 16 16">' +
   '<path fill-rule="evenodd" d="M2 15.5V2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.74.439L8 13.069l-5.26 2.87A.5.5 0 0 1 2 15.5M8.16 4.1a.178.178 0 0 0-.32 0l-.634 1.285a.18.18 0 0 1-.134.098l-1.42.206a.178.178 0 0 0-.098.303L6.58 7.286a.18.18 0 0 1 .051.158L6.3 8.858a.178.178 0 0 0 .258.187l1.27-.668a.18.18 0 0 1 .165 0l1.27.668a.178.178 0 0 0 .257-.187L9.27 7.444a.18.18 0 0 1 .05-.158l1.028-1.001a.178.178 0 0 0-.098-.303l-1.42-.206a.18.18 0 0 1-.134-.098z"></path>' +
   "</svg>";
+// Attribution-modal glyphs (close, copy, copied-check).
+const CLOSE_ICON =
+  '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+const COPY_ICON =
+  '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+const CHECK_ICON =
+  '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 
 const DEFAULT_PEAKS: number[] = Array.from({ length: 80 }, (_v, i) =>
   22 + Math.round(45 * Math.abs(Math.sin(i / 3.5))),
@@ -376,6 +383,134 @@ function fallbackDownload(track: UiTrack): void {
   }
 }
 
+// --- attribution modal (shown after an in-app download) --------------------
+
+// Free To Use is free to use with credit. Because the download happens INSIDE the
+// app here (not on the track page), pop the same attribution reminder the other
+// FTU apps show, so the user has the credit text to hand. Built client-side from
+// title+artist (matches the server's attribution format) — no extra payload.
+let attrEl: any = null;
+
+function copyText(text: string): Promise<boolean> {
+  try {
+    const c: any = (navigator as any).clipboard;
+    if (c && c.writeText) return c.writeText(text).then(() => true).catch(() => fallbackCopy(text));
+  } catch (_e) {}
+  return Promise.resolve(fallbackCopy(text));
+}
+
+function fallbackCopy(text: string): boolean {
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function closeAttribution(): void {
+  if (attrEl) {
+    try { attrEl.remove(); } catch (_e) {}
+    attrEl = null;
+  }
+  document.body.classList.remove("modal-open");
+  document.removeEventListener("keydown", onAttrKey);
+}
+
+function onAttrKey(e: any): void {
+  if (e.key === "Escape") closeAttribution();
+}
+
+function showAttribution(track: UiTrack): void {
+  closeAttribution();
+  const title = track.title || "This track";
+  const artist = track.artist || "Free To Use";
+  const lines = [`Music track: ${title} by ${artist}`, "Source: https://freetouse.com/music"];
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "attr-backdrop";
+  backdrop.setAttribute("role", "dialog");
+  backdrop.setAttribute("aria-modal", "true");
+  backdrop.setAttribute("aria-label", "Attribution is required");
+  backdrop.addEventListener("click", closeAttribution);
+
+  const modal = document.createElement("div");
+  modal.className = "attr-modal";
+  modal.addEventListener("click", (e: any) => e.stopPropagation());
+
+  const head = document.createElement("div");
+  head.className = "attr-head";
+  const h = document.createElement("span");
+  h.className = "attr-title";
+  h.textContent = "Attribution is required";
+  const close = document.createElement("button");
+  close.className = "attr-close";
+  close.setAttribute("aria-label", "Close");
+  close.innerHTML = CLOSE_ICON;
+  close.addEventListener("click", closeAttribution);
+  head.appendChild(h);
+  head.appendChild(close);
+
+  const desc = document.createElement("p");
+  desc.className = "attr-desc";
+  const em = document.createElement("em");
+  const strong = document.createElement("strong");
+  strong.textContent = `${title} by ${artist}`;
+  em.appendChild(strong);
+  desc.appendChild(em);
+  desc.appendChild(
+    document.createTextNode(
+      " is free to use in non-commercial content as long as you provide attribution in your video description.",
+    ),
+  );
+
+  const box = document.createElement("div");
+  box.className = "attr-box";
+  const linesEl = document.createElement("div");
+  linesEl.className = "attr-lines";
+  lines.forEach((l) => {
+    const s = document.createElement("span");
+    s.className = "attr-line";
+    s.textContent = l;
+    linesEl.appendChild(s);
+  });
+  const copy = document.createElement("button");
+  copy.className = "attr-copy";
+  copy.title = "Copy";
+  copy.setAttribute("aria-label", "Copy attribution");
+  copy.innerHTML = COPY_ICON;
+  copy.addEventListener("click", () => {
+    copyText(lines.join("\n")).then((ok) => {
+      if (!ok) return;
+      copy.classList.add("copied");
+      copy.innerHTML = CHECK_ICON;
+      setTimeout(() => {
+        copy.classList.remove("copied");
+        copy.innerHTML = COPY_ICON;
+      }, 2000);
+    });
+  });
+  box.appendChild(linesEl);
+  box.appendChild(copy);
+
+  modal.appendChild(head);
+  modal.appendChild(desc);
+  modal.appendChild(box);
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+  document.body.classList.add("modal-open");
+  attrEl = backdrop;
+  document.addEventListener("keydown", onAttrKey);
+  try { close.focus(); } catch (_e) {}
+}
+
 // --- external links (host-mediated) ----------------------------------------
 
 // Open a freetouse.com page (track/artist/category/search). Sandboxed host
@@ -548,7 +683,12 @@ function buildRow(track: UiTrack): RowState {
   const state: RowState = { track, el, bars, wave: waveEl, durEl, playBtn, idx: -1, resumeTime: 0, completed: false };
 
   playBtn.addEventListener("click", () => playTrack(state));
-  dlBtn.addEventListener("click", () => download(track));
+  // Download, then show the attribution reminder (the download happens in-app here,
+  // so the user gets the credit text without visiting the track page).
+  dlBtn.addEventListener("click", () => {
+    download(track);
+    showAttribution(track);
+  });
 
   // Click + drag to scrub (pointer capture so dragging works off the bar).
   let dragging = false;
@@ -741,6 +881,7 @@ function render(data: ResultData | null | undefined): void {
   // loading flag so a stale request can't append foreign rows or stick the button.
   gen++;
   loadingMore = false;
+  closeAttribution(); // don't leave a download modal hanging over fresh results
 
   const a = audioEl();
   a.pause();

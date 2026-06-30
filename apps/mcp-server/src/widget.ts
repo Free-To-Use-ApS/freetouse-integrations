@@ -21,7 +21,7 @@ const CSS = `
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ftu-secondary); }
   /* Force Nunito with high specificity in case the host injects its own font. */
-  .head, .title, .artist, .chip, .dur { font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
+  .head, .title, .artist, .chip, .dur, .attr-title, .attr-desc, .attr-line { font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
   .head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 4px 10px; }
   .head { font-size: 13px; color: #8a8a8a; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Sort dropdown (top-right) — styled to match the Load more button: a fully
@@ -32,6 +32,27 @@ const CSS = `
   .sort.hidden { display: none; }
   .list { display: flex; flex-direction: column; gap: 10px; }
   .empty { padding: 18px 4px; color: #8a8a8a; font-size: 13px; }
+
+  /* Attribution modal — shown after an in-app download (only here, where the
+     player renders; on link-only hosts the user sees attribution on the track
+     page). modal-open gives the body enough height for the fixed overlay to fit
+     even on a short single-track widget. */
+  body.modal-open { min-height: 252px; }
+  .attr-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .attr-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 430px; padding: 18px; display: flex; flex-direction: column; gap: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.22); }
+  .attr-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .attr-title { font-size: 17px; font-weight: 800; line-height: 1.2; color: var(--ftu-secondary); }
+  .attr-close { flex: none; background: none; border: none; cursor: pointer; color: #9a9a9a; padding: 0; display: flex; align-items: center; margin-top: 2px; }
+  .attr-close:hover { color: var(--ftu-secondary); }
+  .attr-close svg { width: 18px; height: 18px; fill: currentColor; }
+  .attr-desc { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ftu-secondary); }
+  .attr-box { display: flex; align-items: flex-start; gap: 8px; padding: 12px; background: #f7f7f8; border: 1px solid #ededed; border-radius: 10px; }
+  .attr-lines { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .attr-line { font-size: 12px; line-height: 1.5; color: var(--ftu-secondary); word-break: break-word; }
+  .attr-copy { flex: none; align-self: flex-start; background: none; border: none; cursor: pointer; color: #9a9a9a; padding: 0; display: flex; align-items: center; transition: color .15s ease; }
+  .attr-copy:hover { color: var(--ftu-primary); }
+  .attr-copy.copied { color: #34a853; }
+  .attr-copy svg { width: 18px; height: 18px; fill: currentColor; }
 
   /* Card. The frame (border, radius, shadow) and content clipping live on
      .player-clip; .player is a transparent positioning wrapper so the premium
