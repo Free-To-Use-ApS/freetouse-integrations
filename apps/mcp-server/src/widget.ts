@@ -31,6 +31,7 @@ const CSS = `
   .sort:disabled { opacity: .6; cursor: default; }
   .sort.hidden { display: none; }
   .list { display: flex; flex-direction: column; gap: 10px; }
+  .empty { padding: 18px 4px; color: #8a8a8a; font-size: 13px; }
 
   /* Card. The frame (border, radius, shadow) and content clipping live on
      .player-clip; .player is a transparent positioning wrapper so the premium
@@ -55,6 +56,12 @@ const CSS = `
   .lnk { cursor: pointer; }
   .cover.lnk:hover { opacity: .9; }
   .chip.lnk:hover { background: #e6e6ec; color: #5f5f5f; }
+
+  /* Visible keyboard focus for every interactive element. */
+  .ftu-wave:focus-visible, .lnk:focus-visible, .play:focus-visible, .dl:focus-visible,
+  .loadmore:focus-visible, .sort:focus-visible {
+    outline: 2px solid var(--ftu-primary); outline-offset: 2px;
+  }
   /* Premium indicator: a bookmark-star in the card's upper-right corner that pokes
      slightly ABOVE the frame (like freetouse.com). It sits clear above the download
      button so it never blocks the button, and stays hoverable for the "Premium

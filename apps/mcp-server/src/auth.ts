@@ -10,7 +10,10 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { InvalidTokenError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
+import {
+  InvalidTokenError,
+  InvalidClientMetadataError,
+} from "@modelcontextprotocol/sdk/server/auth/errors.js";
 
 // Anonymous, STATELESS OAuth 2.1 provider.
 //
@@ -87,13 +90,47 @@ function verifyJwt(token: string): JwtPayload | null {
 // The client_id we hand back IS a signed token encoding the registration, so we
 // can reconstruct the client on later requests without storing anything.
 
+// Only register redirect URIs we'd actually 302 a user to. Since authorize()
+// issues a code immediately and redirects, an unvalidated redirect_uri would make
+// this an open-redirect / code-delivery primitive. Allow https:// and loopback
+// http (localhost) only, and cap count/length so the signed client_id stays sane.
+const MAX_REDIRECT_URIS = 5;
+function validateRedirectUris(uris: unknown): string[] {
+  // Throw the SDK's OAuth error so dynamic-registration rejections return a proper
+  // 400 invalid_client_metadata (a plain Error would surface as an opaque 500).
+  const reject = (msg: string): never => {
+    throw new InvalidClientMetadataError(msg);
+  };
+  if (!Array.isArray(uris) || uris.length === 0) {
+    reject("at least one redirect_uri is required");
+  }
+  if ((uris as unknown[]).length > MAX_REDIRECT_URIS) {
+    reject("too many redirect_uris");
+  }
+  return (uris as unknown[]).map((raw) => {
+    if (typeof raw !== "string" || raw.length > 2048) {
+      reject("malformed redirect_uri");
+    }
+    let u: URL;
+    try {
+      u = new URL(raw as string);
+    } catch {
+      return reject("redirect_uri must be an absolute URI");
+    }
+    const isLoopback = u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "[::1]";
+    if (u.protocol === "https:" || (u.protocol === "http:" && isLoopback)) return raw as string;
+    return reject("redirect_uri must be https (or http on loopback)");
+  });
+}
+
 class StatelessClients implements OAuthRegisteredClientsStore {
   registerClient(
     client: Omit<OAuthClientInformationFull, "client_id" | "client_id_issued_at">,
   ): OAuthClientInformationFull {
+    const redirect_uris = validateRedirectUris(client.redirect_uris);
     const client_id = signJwt({
       typ: "client",
-      redirect_uris: client.redirect_uris,
+      redirect_uris,
       auth: client.token_endpoint_auth_method ?? "none",
     });
     return {

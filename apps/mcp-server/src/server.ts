@@ -17,6 +17,7 @@ import {
   browseArtist,
   browseCategory,
   findSimilar,
+  resolveTrackRef,
   listCategories,
   hasUsableTerms,
   warmUp,
@@ -24,6 +25,7 @@ import {
   DEFAULT_RESULTS,
   MAX_RESULTS,
   type TrackPage,
+  type UiTrack,
 } from "./ftu.js";
 import { buildWidgetHtml } from "./widget.js";
 import { AnonymousJwtOAuthProvider } from "./auth.js";
@@ -158,13 +160,42 @@ function formatPage(heading: string, page: TrackPage): string {
   return `${heading}\n\n${body}${more}${credit}`;
 }
 
+// Encode the 0-100 waveform bars as a compact base64 string instead of an array
+// of ~80 integers. ChatGPT injects structuredContent into the MODEL's context, so
+// the raw array is pure token bloat there; the widget decodes the string back.
+function encodePeaks(peaks: number[] | undefined): string {
+  if (!peaks || peaks.length === 0) return "";
+  return Buffer.from(peaks.map((v) => Math.max(0, Math.min(100, Math.round(v))))).toString("base64");
+}
+
+// Widget-facing track shape. The model already has everything it needs from the
+// text channel (formatPage), so we drop fields the widget never reads
+// (genre/description/attribution/tags) and compact the peaks, keeping the
+// structuredContent the model sees small.
+function toWireTrack(t: UiTrack) {
+  return {
+    id: t.id,
+    title: t.title,
+    artist: t.artist,
+    duration: t.duration,
+    mp3: t.mp3,
+    art: t.art,
+    url: t.url,
+    artistUrl: t.artistUrl,
+    gain: t.gain,
+    chips: t.chips,
+    premium: t.premium,
+    peaks: encodePeaks(t.peaks),
+  };
+}
+
 // Dual-channel tool result: model-facing text + widget structuredContent.
 function pageResult(heading: string, page: TrackPage, more: MoreRef) {
   return {
     content: [{ type: "text" as const, text: formatPage(heading, page) }],
     structuredContent: {
       heading,
-      tracks: page.tracks,
+      tracks: page.tracks.map(toWireTrack),
       offset: page.offset,
       limit: page.limit,
       total: page.total,
@@ -252,7 +283,7 @@ function buildServer(): McpServer {
   // All track tools share: read-only + open-world annotations, and they bind the
   // results widget so hosts with UI render the players while hosts without UI
   // fall back to the model-facing text from formatPage().
-  const trackAnnotations = { readOnlyHint: true, openWorldHint: true };
+  const trackAnnotations = { readOnlyHint: true, destructiveHint: false, openWorldHint: true };
   const widgetMeta = { ui: { resourceUri: WIDGET_URI } };
 
   // search_music — the primary entry point.
@@ -318,23 +349,46 @@ function buildServer(): McpServer {
     {
       title: "Find similar Free To Use tracks",
       description:
-        "Given the id of a track from a previous result, return tracks with a similar " +
-        "vibe, shown to the user as players. Use when the user asks for 'more like this'.",
+        "Return tracks with a similar vibe to a given track, shown to the user as players. " +
+        "Use when the user asks for 'more like this'. Identify the track by its id (from a " +
+        "previous result) OR — if you don't have an id — by passing its title, \"Artist - " +
+        'Title", or freetouse.com URL in `track`.',
       annotations: trackAnnotations,
       inputSchema: {
-        track_id: z.string().describe("The id of a track from a previous search/browse result."),
+        track_id: z
+          .string()
+          .max(64)
+          .optional()
+          .describe("The id of a track from a previous search/browse result."),
+        track: z
+          .string()
+          .max(200)
+          .optional()
+          .describe('Alternative to track_id: a track title, "Artist - Title", or freetouse.com URL.'),
         limit: limitArg,
         offset: offsetArg,
       },
       _meta: widgetMeta,
     },
-    async ({ track_id, limit, offset }) =>
-      run("find_similar", { track_id, limit, offset }, async () => {
-        const page = await findSimilar(track_id, limit, offset ?? 0);
+    async ({ track_id, track, limit, offset }) =>
+      run("find_similar", { track_id, track, limit, offset }, async () => {
+        const ref = (track_id && track_id.trim()) || (track && track.trim()) || "";
+        const id = await resolveTrackRef(ref);
+        if (!id) {
+          // Not a recognizable track — answer honestly instead of erroring out.
+          return {
+            heading: ref
+              ? `Couldn't find a Free To Use track matching "${ref}"`
+              : "Provide a track (id, title, or URL) to find similar music",
+            page: { tracks: [], total: 0, offset: 0, limit: DEFAULT_RESULTS },
+            more: { tool: "find_similar", args: { track_id: ref } },
+          };
+        }
+        const page = await findSimilar(id, limit, offset ?? 0);
         return {
           heading: "Similar Free To Use tracks",
           page,
-          more: { tool: "find_similar", args: { track_id, limit: page.limit } },
+          more: { tool: "find_similar", args: { track_id: id, limit: page.limit } },
         };
       }),
   );
@@ -436,8 +490,48 @@ function buildServer(): McpServer {
 }
 
 // Stateful Streamable HTTP transport (the pattern remote connectors expect):
-// one transport per session, keyed by the mcp-session-id header.
+// one transport per session, keyed by the mcp-session-id header. Each entry pins
+// a full McpServer, so we must not let dropped/abandoned sessions accumulate.
 const transports: Record<string, StreamableHTTPServerTransport> = {};
+const lastSeen: Record<string, number> = {};
+const SESSION_IDLE_MS = 30 * 60 * 1000; // close sessions idle longer than this
+const MAX_SESSIONS = 500; // hard cap; evict the oldest beyond it
+
+function touchSession(sessionId: string | undefined): void {
+  if (sessionId && transports[sessionId]) lastSeen[sessionId] = Date.now();
+}
+
+function closeSession(sessionId: string): void {
+  const t = transports[sessionId];
+  delete transports[sessionId];
+  delete lastSeen[sessionId];
+  try {
+    t?.close();
+  } catch {
+    /* ignore */
+  }
+}
+
+// Evict the oldest sessions beyond the cap. Called on every new session (so a
+// burst can't blow past the cap between sweeps) AND from the periodic sweep.
+function enforceSessionCap(): void {
+  const ids = Object.keys(transports);
+  if (ids.length <= MAX_SESSIONS) return;
+  ids
+    .sort((a, b) => (lastSeen[a] ?? 0) - (lastSeen[b] ?? 0))
+    .slice(0, ids.length - MAX_SESSIONS)
+    .forEach(closeSession);
+}
+
+// Periodically sweep idle sessions, then re-enforce the cap.
+const sessionSweeper = setInterval(() => {
+  const now = Date.now();
+  for (const sid of Object.keys(transports)) {
+    if (now - (lastSeen[sid] ?? 0) > SESSION_IDLE_MS) closeSession(sid);
+  }
+  enforceSessionCap();
+}, 60 * 1000);
+sessionSweeper.unref?.();
 
 const app = express();
 // Behind one proxy/tunnel/load balancer, so rate limiting keys on the real
@@ -493,15 +587,21 @@ app.post("/mcp", requireAuth, async (req: Request, res: Response) => {
 
   if (sessionId && transports[sessionId]) {
     transport = transports[sessionId];
+    touchSession(sessionId);
   } else if (!sessionId && isInitializeRequest(req.body)) {
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (sid) => {
         transports[sid] = transport;
+        lastSeen[sid] = Date.now();
+        enforceSessionCap();
       },
     });
     transport.onclose = () => {
-      if (transport.sessionId) delete transports[transport.sessionId];
+      if (transport.sessionId) {
+        delete transports[transport.sessionId];
+        delete lastSeen[transport.sessionId];
+      }
     };
     await buildServer().connect(transport);
   } else {
@@ -522,6 +622,7 @@ async function handleSession(req: Request, res: Response): Promise<void> {
     res.status(400).send("Invalid or missing session ID");
     return;
   }
+  touchSession(sessionId);
   await transports[sessionId].handleRequest(req, res);
 }
 
@@ -581,10 +682,29 @@ app.get("/preview", (_req: Request, res: Response) => {
 });
 
 const PORT = Number(process.env.PORT) || 3000;
-app.listen(PORT, () => {
+const httpServer = app.listen(PORT, () => {
   console.log(`Free To Use Music MCP server listening on http://localhost:${PORT}/mcp`);
   // Pre-load the catalog index so the first search is instant.
   warmUp()
     .then((count) => console.log(`Catalog index ready: ${count} tracks.`))
     .catch((e) => console.warn("Catalog index warm-up failed (will retry on first search):", e?.message ?? e));
 });
+
+// Graceful shutdown — Render sends SIGTERM on every deploy. Stop accepting new
+// connections, close open MCP sessions (freeing their long-lived SSE streams), and
+// drop lingering keep-alive sockets so the server can exit promptly. In-flight
+// requests may be cut short (clients reconnect/retry), but nothing leaks across the
+// restart. A failsafe guarantees exit if draining stalls.
+let shuttingDown = false;
+function shutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(JSON.stringify({ evt: "shutdown", signal, sessions: Object.keys(transports).length }));
+  clearInterval(sessionSweeper);
+  httpServer.close(() => process.exit(0));
+  for (const sid of Object.keys(transports)) closeSession(sid);
+  httpServer.closeAllConnections?.();
+  setTimeout(() => process.exit(0), 10000).unref?.();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

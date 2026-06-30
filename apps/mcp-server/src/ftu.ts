@@ -472,6 +472,60 @@ export async function browseCategory(
   return { ...paginate(sortEntries(matches, sort), limit, offset), sort };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolve a track reference to a catalog id. Accepts a raw UUID, a freetouse.com
+ * track URL, or a human reference ("Title", "Artist - Title", "Title by Artist") —
+ * so find_similar works on hosts that only see the text channel (no structured id).
+ * Returns null if nothing matches.
+ */
+// decodeURIComponent throws on a malformed %-escape; fall back to the raw segment
+// so an odd pasted URL degrades to a normal title lookup rather than an error.
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+export async function resolveTrackRef(ref: string): Promise<string | null> {
+  const r = (ref ?? "").trim();
+  if (!r) return null;
+  if (UUID_RE.test(r)) return r;
+  const entries = await getIndex();
+  const pickByTitle = (tl: string, al: string): string | null => {
+    if (!tl) return null;
+    const matchArtist = (e: IndexEntry) => !al || e.artistLc.includes(al);
+    let pool = entries.filter((e) => e.titleLc === tl && matchArtist(e));
+    if (pool.length === 0 && tl.length >= 3) {
+      pool = entries.filter((e) => e.titleLc.includes(tl) && matchArtist(e));
+    }
+    if (pool.length === 0) return null;
+    pool.sort((a, b) => b.downloads - a.downloads);
+    return pool[0].id;
+  };
+  // freetouse.com/music/<artist>/<title>
+  const m = r.match(/freetouse\.com\/music\/([^/?#]+)\/([^/?#]+)/i);
+  if (m) {
+    const wanted = `/music/${slug(safeDecode(m[1]))}/${slug(safeDecode(m[2]))}`;
+    const hit = entries.find((e) => e.url.toLowerCase().endsWith(wanted));
+    if (hit) return hit.id;
+  }
+  const rl = r.toLowerCase();
+  // Try the whole string as a title FIRST, so real titles containing " by " or
+  // " - " (e.g. "Saved by Brothers") aren't mis-split into title + artist.
+  const whole = pickByTitle(rl, "");
+  if (whole) return whole;
+  // Otherwise interpret "Artist - Title" / "Title by Artist".
+  const dash = r.split(/\s+[-–—]\s+/);
+  const by = r.split(/\s+by\s+/i);
+  if (dash.length === 2) return pickByTitle(dash[1].trim().toLowerCase(), dash[0].trim().toLowerCase());
+  if (by.length === 2) return pickByTitle(by[0].trim().toLowerCase(), by[1].trim().toLowerCase());
+  return null;
+}
+
 /** Tracks similar to a given track id, using the API's /related model. */
 export async function findSimilar(trackId: string, limit?: number, offset = 0): Promise<TrackPage> {
   const n = clampLimit(limit);

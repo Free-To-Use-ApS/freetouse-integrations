@@ -25,7 +25,9 @@ interface UiTrack {
   genre?: string | null;
   description?: string;
   gain?: number;
-  peaks?: number[];
+  // number[] in /preview & MCP-UI; a compact base64 string from the server (decoded
+  // client-side) so the raw 80-int array doesn't bloat the model's context.
+  peaks?: number[] | string;
   chips?: { label: string; href: string }[];
   premium?: boolean;
 }
@@ -45,6 +47,7 @@ interface RowState {
   track: UiTrack;
   el: any;
   bars: any[];
+  wave: any; // the .ftu-wave scrubber (role=slider) — aria-valuenow updated on progress
   durEl: any;
   playBtn: any;
   idx: number; // index of last "played" bar (-1 = none)
@@ -73,6 +76,23 @@ const PREMIUM =
 const DEFAULT_PEAKS: number[] = Array.from({ length: 80 }, (_v, i) =>
   22 + Math.round(45 * Math.abs(Math.sin(i / 3.5))),
 );
+
+// Waveform bars arrive as a base64 string of 0-100 bytes from the server (kept
+// compact so they don't bloat the model context) or as a raw number[] in preview.
+function decodePeaks(p: number[] | string | undefined): number[] {
+  if (Array.isArray(p)) return p;
+  if (typeof p === "string" && p.length) {
+    try {
+      const bin = atob(p);
+      const out: number[] = [];
+      for (let i = 0; i < bin.length; i++) out.push(bin.charCodeAt(i));
+      return out;
+    } catch (_e) {
+      return [];
+    }
+  }
+  return [];
+}
 
 // Waveform fill colours (mirror the CSS --ftu vars). As the playhead crosses each
 // bar we fade it from grey to purple via the Web Animations API rather than rely
@@ -173,6 +193,12 @@ function paintBar(bar: any, played: boolean, animate: boolean): void {
 
 function setProgress(state: RowState, frac: number, animate: boolean): void {
   const n = state.bars.length;
+  // Keep the slider's reported value in sync for assistive tech.
+  if (state.wave) {
+    state.wave.setAttribute("aria-valuenow", String(Math.round(Math.max(0, Math.min(1, frac)) * 100)));
+    const dur = state.track.duration || 0;
+    if (dur) state.wave.setAttribute("aria-valuetext", `${fmt(frac * dur)} of ${fmt(dur)}`);
+  }
   let idx = Math.floor(frac * n);
   if (idx >= n) idx = n - 1;
   if (idx < -1) idx = -1;
@@ -194,6 +220,10 @@ function resetRow(state: RowState): void {
   }
   state.idx = -1;
   state.durEl.textContent = fmt(state.track.duration);
+  if (state.wave) {
+    state.wave.setAttribute("aria-valuenow", "0");
+    state.wave.removeAttribute("aria-valuetext");
+  }
 }
 
 // Mark a whole row played (every bar purple) — used when a track finishes so it
@@ -201,6 +231,12 @@ function resetRow(state: RowState): void {
 function fillAll(state: RowState): void {
   for (let i = 0; i < state.bars.length; i++) state.bars[i].dataset.played = "true";
   state.idx = state.bars.length - 1;
+  if (state.wave) {
+    state.wave.setAttribute("aria-valuenow", "100");
+    const dur = state.track.duration || 0;
+    if (dur) state.wave.setAttribute("aria-valuetext", `${fmt(dur)} of ${fmt(dur)}`);
+    else state.wave.removeAttribute("aria-valuetext");
+  }
 }
 
 function setRowPlaying(state: RowState, playing: boolean): void {
@@ -362,13 +398,21 @@ function winOpen(href: string): void {
   try { window.open(href, "_blank", "noopener,noreferrer"); } catch (_e) {}
 }
 
-// Wire an element to open a freetouse.com link on click (cursor handled in CSS).
-function linkTo(el: any, href?: string): void {
+// Wire an element to open a freetouse.com link on click or keyboard activation,
+// and expose it to assistive tech as a link (cursor handled in CSS).
+function linkTo(el: any, href?: string, label?: string): void {
   if (!href) return;
-  el.addEventListener("click", (e: any) => {
+  el.setAttribute("role", "link");
+  el.setAttribute("tabindex", "0");
+  if (label) el.setAttribute("aria-label", label);
+  const go = (e: any) => {
     e.preventDefault();
     e.stopPropagation();
     openHref(href);
+  };
+  el.addEventListener("click", go);
+  el.addEventListener("keydown", (e: any) => {
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") go(e);
   });
 }
 
@@ -381,9 +425,13 @@ function buildRow(track: UiTrack): RowState {
   // Cover art links to the track page on freetouse.com.
   const cover = document.createElement("img");
   cover.className = "cover";
-  cover.alt = "";
+  cover.alt = track.title ? `${track.title} cover art` : "";
   if (track.art) cover.src = track.art;
-  if (track.url) { cover.classList.add("lnk"); cover.title = track.title || ""; linkTo(cover, track.url); }
+  if (track.url) {
+    cover.classList.add("lnk");
+    cover.title = track.title || "";
+    linkTo(cover, track.url, `Open ${track.title || "track"} on Free To Use`);
+  }
 
   const meta = document.createElement("div");
   meta.className = "meta";
@@ -391,11 +439,17 @@ function buildRow(track: UiTrack): RowState {
   const title = document.createElement("div");
   title.className = "title";
   title.textContent = track.title || "Untitled";
-  if (track.url) { title.classList.add("lnk"); linkTo(title, track.url); }
+  if (track.url) {
+    title.classList.add("lnk");
+    linkTo(title, track.url, `${track.title || "Track"} — open track page`);
+  }
   const artist = document.createElement("div");
   artist.className = "artist";
   artist.textContent = track.artist || "";
-  if (track.artistUrl) { artist.classList.add("lnk"); linkTo(artist, track.artistUrl); }
+  if (track.artistUrl) {
+    artist.classList.add("lnk");
+    linkTo(artist, track.artistUrl, `${track.artist || "Artist"} — open artist page`);
+  }
   meta.appendChild(title);
   meta.appendChild(artist);
 
@@ -413,7 +467,7 @@ function buildRow(track: UiTrack): RowState {
       const s = document.createElement("span");
       s.className = "chip";
       s.textContent = c.label;
-      if (c.href) { s.classList.add("lnk"); linkTo(s, c.href); }
+      if (c.href) { s.classList.add("lnk"); linkTo(s, c.href, `${c.label} — browse on Free To Use`); }
       chipsEl.appendChild(s);
     });
   }
@@ -425,7 +479,15 @@ function buildRow(track: UiTrack): RowState {
 
   const waveEl = document.createElement("div");
   waveEl.className = "ftu-wave";
-  const peaks = track.peaks && track.peaks.length ? track.peaks : DEFAULT_PEAKS;
+  // Expose the scrubber as a keyboard/screen-reader slider.
+  waveEl.setAttribute("role", "slider");
+  waveEl.setAttribute("tabindex", "0");
+  waveEl.setAttribute("aria-label", `Seek ${track.title || "track"}`);
+  waveEl.setAttribute("aria-valuemin", "0");
+  waveEl.setAttribute("aria-valuemax", "100");
+  waveEl.setAttribute("aria-valuenow", "0");
+  const decoded = decodePeaks(track.peaks);
+  const peaks = decoded.length ? decoded : DEFAULT_PEAKS;
   const bars: any[] = [];
   peaks.forEach((v) => {
     const b = document.createElement("span");
@@ -483,7 +545,7 @@ function buildRow(track: UiTrack): RowState {
     el.appendChild(star);
   }
 
-  const state: RowState = { track, el, bars, durEl, playBtn, idx: -1, resumeTime: 0, completed: false };
+  const state: RowState = { track, el, bars, wave: waveEl, durEl, playBtn, idx: -1, resumeTime: 0, completed: false };
 
   playBtn.addEventListener("click", () => playTrack(state));
   dlBtn.addEventListener("click", () => download(track));
@@ -505,6 +567,21 @@ function buildRow(track: UiTrack): RowState {
   };
   waveEl.addEventListener("pointerup", stop);
   waveEl.addEventListener("pointercancel", stop);
+
+  // Keyboard scrubbing: arrows seek +/-5%, Home/End jump to ends, Space toggles play.
+  waveEl.addEventListener("keydown", (e: any) => {
+    const a = audioEl();
+    const cur =
+      active === state && a.duration ? a.currentTime / a.duration : (state.idx + 1) / state.bars.length;
+    let handled = true;
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") seek(state, Math.min(1, cur + 0.05));
+    else if (e.key === "ArrowLeft" || e.key === "ArrowDown") seek(state, Math.max(0, cur - 0.05));
+    else if (e.key === "Home") seek(state, 0);
+    else if (e.key === "End") seek(state, 0.999);
+    else if (e.key === " " || e.key === "Spacebar" || e.key === "Enter") playTrack(state);
+    else handled = false;
+    if (handled) e.preventDefault();
+  });
 
   return state;
 }
@@ -653,8 +730,12 @@ function loadMore(): void {
 }
 
 function render(data: ResultData | null | undefined): void {
-  const tracks = (data && data.tracks) || [];
-  if (!tracks.length) return;
+  // Only wait when there's genuinely no result yet. A present result with an
+  // empty tracks list (e.g. a zero-result search, or find_similar not finding the
+  // track) is a real answer — render its heading + an empty state, never leave a
+  // stale list or placeholder heading on screen.
+  if (!data || !data.tracks) return;
+  const tracks = data.tracks;
   rendered = true;
   // New render generation: invalidates any in-flight Load more and clears the
   // loading flag so a stale request can't append foreign rows or stick the button.
@@ -668,19 +749,27 @@ function render(data: ResultData | null | undefined): void {
   pendingSeek = null;
 
   const head = document.getElementById("head");
-  if (head) head.textContent = (data && data.heading) || "Free To Use";
+  if (head) head.textContent = data.heading || "Free To Use";
 
   const list = document.getElementById("list");
   if (!list) return;
   list.textContent = "";
   rows = [];
-  appendRows(tracks);
+  if (tracks.length) {
+    appendRows(tracks);
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "No tracks found.";
+    list.appendChild(empty);
+  }
 
-  curTotal = data && typeof data.total === "number" ? data.total : tracks.length;
-  renderedCount = ((data && data.offset) || 0) + tracks.length;
-  curMore = (data && data.more) || null;
+  curTotal = typeof data.total === "number" ? data.total : tracks.length;
+  renderedCount = (data.offset || 0) + tracks.length;
+  curMore = data.more || null;
 
-  configureSort(data);
+  // No sort dropdown / Load more on an empty result.
+  configureSort(tracks.length ? data : { ...data, sort: null });
   wireAudioOnce();
   renderLoadMore();
 }

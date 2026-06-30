@@ -29,9 +29,14 @@ function qs(params: Record<string, unknown>): string {
   return "?" + new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
 }
 
-async function request<T>(path: string, params: object = {}): Promise<T> {
+// Every outbound call is bounded by a timeout. Without one, a stalled upstream
+// connection never settles — and because callers share an in-flight index-build
+// promise, a single hung request can wedge all traffic on the instance.
+const DEFAULT_TIMEOUT_MS = 8000;
+
+async function request<T>(path: string, params: object = {}, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
   const url = `${baseUrl}${path}${qs(params as Record<string, unknown>)}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) {
     throw new Error(`FTU API error: ${res.status} ${res.statusText}`);
   }
@@ -59,7 +64,7 @@ export function getTrackBySlug(artist: string, title: string) {
 }
 
 export function getRelatedTracks(id: string, params: RelatedParams = {}) {
-  return request<PaginatedResponse<RelatedTrack>>(`/music/tracks/${id}/related`, params);
+  return request<PaginatedResponse<RelatedTrack>>(`/music/tracks/${encodeURIComponent(id)}/related`, params);
 }
 
 // ---------------------------------------------------------------------------
