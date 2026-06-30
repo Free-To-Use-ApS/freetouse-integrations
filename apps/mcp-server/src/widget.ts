@@ -24,9 +24,10 @@ const CSS = `
   .head, .title, .artist, .chip, .dur { font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
   .head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 4px 10px; }
   .head { font-size: 13px; color: #8a8a8a; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* Sort dropdown (top-right) — mirrors the freetouse.com sort options. */
-  .sort { font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--ftu-secondary); background: #fff; border: 1px solid #ededed; border-radius: 8px; padding: 4px 8px; cursor: pointer; flex: none; max-width: 45%; }
-  .sort:hover { border-color: #dcdcdc; }
+  /* Sort dropdown (top-right) — styled to match the Load more button: a fully
+     rounded white pill with a soft shadow and a custom chevron (no OS arrow). */
+  .sort { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ftu-secondary); background-color: #fff; border: 1px solid #ededed; border-radius: 999px; padding: 7px 30px 7px 15px; cursor: pointer; flex: none; max-width: 60%; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: background-color .15s ease, border-color .15s ease; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; }
+  .sort:hover { background-color: #f6f6f7; border-color: #dcdcdc; }
   .sort:disabled { opacity: .6; cursor: default; }
   .sort.hidden { display: none; }
   .list { display: flex; flex-direction: column; gap: 10px; }
@@ -64,7 +65,7 @@ const CSS = `
   /* Load more: a small, neutral (near-black) button tucked into the lower right,
      echoing the player cards (white, hairline border, soft shadow). */
   .more { display: flex; justify-content: flex-end; padding: 10px 0 16px; }
-  .loadmore { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ftu-secondary); background: #fff; border: 1px solid #ededed; border-radius: 10px; padding: 7px 16px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: background-color .15s ease, border-color .15s ease; }
+  .loadmore { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ftu-secondary); background: #fff; border: 1px solid #ededed; border-radius: 999px; padding: 7px 16px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: background-color .15s ease, border-color .15s ease; }
   .loadmore:hover { background: #f6f6f7; border-color: #dcdcdc; }
   .loadmore:disabled { opacity: .6; cursor: default; }
 
