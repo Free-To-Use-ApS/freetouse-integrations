@@ -22,7 +22,13 @@ const CSS = `
   body { margin: 0; font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ftu-secondary); }
   /* Force Nunito with high specificity in case the host injects its own font. */
   .head, .title, .artist, .chip, .dur { font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
-  .head { font-size: 13px; color: #8a8a8a; font-weight: 600; padding: 8px 4px 10px; }
+  .head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 4px 10px; }
+  .head { font-size: 13px; color: #8a8a8a; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Sort dropdown (top-right) — mirrors the freetouse.com sort options. */
+  .sort { font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--ftu-secondary); background: #fff; border: 1px solid #ededed; border-radius: 8px; padding: 4px 8px; cursor: pointer; flex: none; max-width: 45%; }
+  .sort:hover { border-color: #dcdcdc; }
+  .sort:disabled { opacity: .6; cursor: default; }
+  .sort.hidden { display: none; }
   .list { display: flex; flex-direction: column; gap: 10px; }
 
   /* Card. The frame (border, radius, shadow) and content clipping live on
@@ -96,7 +102,10 @@ const CSS = `
 `;
 
 const BODY = `
-  <div class="head" id="head">Free To Use</div>
+  <div class="head-row">
+    <div class="head" id="head">Free To Use</div>
+    <select class="sort hidden" id="sort" aria-label="Sort tracks"></select>
+  </div>
   <div class="list" id="list"></div>
   <div class="more" id="more"></div>
   <audio id="audio" preload="none"></audio>

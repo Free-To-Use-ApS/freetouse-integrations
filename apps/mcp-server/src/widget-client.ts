@@ -36,6 +36,8 @@ interface ResultData {
   offset?: number;
   limit?: number;
   total?: number;
+  /** Active sort (drives the dropdown). null/absent = no sort dropdown. */
+  sort?: string | null;
   more?: { tool: string; args: Record<string, unknown> } | null;
 }
 
@@ -85,7 +87,8 @@ const FALLBACK: ResultData = {
   offset: 0,
   limit: 20,
   total: 1,
-  more: null,
+  sort: "relevance",
+  more: { tool: "search_music", args: { query: "lofi", limit: 20, sort: "relevance" } },
   tracks: [
     {
       title: "remedy",
@@ -529,6 +532,77 @@ function renderLoadMore(): void {
   moreEl.appendChild(btn);
 }
 
+// --- sort dropdown ----------------------------------------------------------
+
+const SORT_LABELS: Record<string, string> = {
+  relevance: "Best match",
+  staff: "Staff picks",
+  popular: "Popular",
+  newest: "Newest",
+  undiscovered: "Undiscovered",
+};
+
+// Search offers "Best match" (relevance) on top of the shared options — but only
+// when there's an actual query (a curated/empty search has nothing to rank, so it
+// defaults to staff). Browse tools just get the four freetouse.com sorts.
+function sortOptionsFor(tool?: string, hasQuery?: boolean): string[] {
+  const base = ["staff", "popular", "newest", "undiscovered"];
+  return tool === "search_music" && hasQuery ? ["relevance", ...base] : base;
+}
+
+let sortWired = false;
+// Populate + show the sort <select> for the current result, or hide it when the
+// result carries no sort (e.g. find_similar).
+function configureSort(data: ResultData | null | undefined): void {
+  const sel: any = document.getElementById("sort");
+  if (!sel) return;
+  const tool = data && data.more && data.more.tool;
+  const sort = data && data.sort;
+  if (!sort || !tool) {
+    sel.classList.add("hidden");
+    return;
+  }
+  const args: any = (data && data.more && data.more.args) || {};
+  const hasQuery = typeof args.query === "string" && args.query.trim().length > 0;
+  const opts = sortOptionsFor(tool, hasQuery);
+  const want = opts.join(",");
+  if (sel.dataset.opts !== want) {
+    sel.innerHTML = "";
+    opts.forEach((k) => {
+      const o = document.createElement("option");
+      o.value = k;
+      o.textContent = SORT_LABELS[k] || k;
+      sel.appendChild(o);
+    });
+    sel.dataset.opts = want;
+  }
+  sel.value = opts.indexOf(sort) >= 0 ? sort : opts[0];
+  // Remember the ordering actually applied, so a failed re-fetch can revert the
+  // dropdown label instead of lying about the on-screen order.
+  sel.dataset.applied = sel.value;
+  sel.classList.remove("hidden");
+  if (!sortWired) {
+    sortWired = true;
+    sel.addEventListener("change", onSortChange);
+  }
+}
+
+// Changing the sort re-fetches the same query/category/artist from offset 0 with
+// the new order (the result set is unchanged — only its ordering).
+function onSortChange(): void {
+  const sel: any = document.getElementById("sort");
+  if (!sel || !curMore) return;
+  const args = Object.assign({}, curMore.args, { sort: sel.value, offset: 0 });
+  sel.disabled = true;
+  // Revert the label to the last-applied sort if the re-fetch doesn't render, so
+  // the dropdown never shows an order the list isn't actually in.
+  const revert = () => { if (sel.dataset.applied) sel.value = sel.dataset.applied; };
+  callTool(curMore.tool, args)
+    .then((d) => { if (d) render(d); else revert(); })
+    .catch(revert)
+    .then(() => { sel.disabled = false; });
+}
+
 function extractResult(r: any): ResultData | null {
   if (!r) return null;
   if (r.structuredContent) return r.structuredContent;
@@ -606,6 +680,7 @@ function render(data: ResultData | null | undefined): void {
   renderedCount = ((data && data.offset) || 0) + tracks.length;
   curMore = (data && data.more) || null;
 
+  configureSort(data);
   wireAudioOnce();
   renderLoadMore();
 }

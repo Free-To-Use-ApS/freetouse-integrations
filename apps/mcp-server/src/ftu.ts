@@ -53,6 +53,12 @@ export interface UiTrack {
 
 interface IndexEntry extends UiTrack {
   downloads: number;
+  /** Play count — fewest first powers the "undiscovered" sort. */
+  plays: number;
+  /** release_date as epoch ms — most recent first powers the "newest" sort. */
+  released: number;
+  /** Curated staff_order — ascending is the "staff picks" sort. */
+  staffOrder: number;
   titleLc: string;
   artistLc: string;
   genreLc: string;
@@ -62,12 +68,20 @@ interface IndexEntry extends UiTrack {
   catsLc: string[];
 }
 
+/**
+ * Track ordering. "relevance" = best keyword match (search only); the rest mirror
+ * the freetouse.com sort dropdown. "undiscovered" = fewest plays (hidden gems).
+ */
+export type SortKey = "relevance" | "staff" | "popular" | "newest" | "undiscovered";
+
 /** A page of results plus the totals a client needs to paginate. */
 export interface TrackPage {
   tracks: UiTrack[];
   total: number;
   offset: number;
   limit: number;
+  /** The ordering actually applied, so the widget's sort dropdown can reflect it. */
+  sort?: SortKey;
 }
 
 export const DEFAULT_RESULTS = 20;
@@ -215,6 +229,9 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     premium: Boolean(t.is_premium),
     attribution: attributionFor(title, artist),
     downloads: t.downloads ?? 0,
+    plays: t.plays ?? 0,
+    released: Date.parse(t.release_date ?? "") || 0,
+    staffOrder: t.staff_order ?? 0,
     titleLc: title.toLowerCase(),
     artistLc: artist.toLowerCase(),
     genreLc: (t.genre ?? "").toLowerCase(),
@@ -332,6 +349,9 @@ function scoreEntry(entry: IndexEntry, groups: string[][]): { matches: number; w
 function strip(e: IndexEntry): UiTrack {
   const {
     downloads: _d,
+    plays: _p,
+    released: _r,
+    staffOrder: _so,
     tagcat: _tc,
     titleLc: _t,
     artistLc: _a,
@@ -340,6 +360,27 @@ function strip(e: IndexEntry): UiTrack {
     ...ui
   } = e;
   return ui;
+}
+
+// Re-order a filtered result set by the chosen sort. "relevance" is handled by the
+// caller (it needs the per-query match weight), so it's a no-op here.
+function sortEntries(entries: IndexEntry[], sort: SortKey): IndexEntry[] {
+  const arr = entries.slice();
+  switch (sort) {
+    case "popular":
+      arr.sort((a, b) => b.downloads - a.downloads);
+      break;
+    case "newest":
+      arr.sort((a, b) => b.released - a.released);
+      break;
+    case "undiscovered":
+      arr.sort((a, b) => a.plays - b.plays);
+      break;
+    case "staff":
+      arr.sort((a, b) => a.staffOrder - b.staffOrder);
+      break;
+  }
+  return arr;
 }
 
 function clampLimit(limit?: number): number {
@@ -360,29 +401,53 @@ function paginate(entries: IndexEntry[], limit?: number, offset = 0): TrackPage 
 // --- public API -------------------------------------------------------------
 
 /** Search the catalog by mood / genre / activity / artist / title. */
-export async function searchMusic(query: string, limit?: number, offset = 0): Promise<TrackPage> {
+export async function searchMusic(
+  query: string,
+  limit?: number,
+  offset = 0,
+  sort: SortKey = "relevance",
+): Promise<TrackPage> {
   const entries = await getIndex();
   const ts = terms(query ?? "");
-  if (ts.length === 0) return paginate(entries, limit, offset); // curated (staff order)
+  if (ts.length === 0) {
+    // No real query: a curated list. Default to staff picks (the index's order);
+    // honor an explicit popular/newest/undiscovered/staff choice if asked.
+    const useStaff = sort === "relevance" || sort === "staff";
+    return {
+      ...paginate(useStaff ? entries : sortEntries(entries, sort), limit, offset),
+      sort: useStaff ? "staff" : sort,
+    };
+  }
   const scored = entries
     .map((e) => ({ e, ...scoreEntry(e, ts) }))
     .filter((x) => x.matches > 0);
   // Keep ONLY the tracks that satisfy the most query words, so a multi-word query
   // intersects rather than unions: "lofi tracks by pufino" -> Pufino's lofi tracks,
   // not every track matching "lofi" OR "pufino". (Single-word queries are
-  // unaffected — every match has matches=1.) Rank the kept tier by field strength.
+  // unaffected — every match has matches=1.)
   const maxMatches = scored.reduce((m, x) => (x.matches > m ? x.matches : m), 0);
-  const ranked = scored
-    .filter((x) => x.matches === maxMatches)
-    .sort((a, b) => b.weight - a.weight || b.e.downloads - a.e.downloads)
-    .map((x) => x.e);
-  return paginate(ranked, limit, offset);
+  const tier = scored.filter((x) => x.matches === maxMatches);
+  // Default order is relevance (field strength, then downloads). An explicit sort
+  // re-orders the SAME matched set — it never changes which tracks are included.
+  const ranked =
+    sort === "relevance"
+      ? tier.sort((a, b) => b.weight - a.weight || b.e.downloads - a.e.downloads).map((x) => x.e)
+      : sortEntries(
+          tier.map((x) => x.e),
+          sort,
+        );
+  return { ...paginate(ranked, limit, offset), sort };
 }
 
-/** All tracks by an artist (case-insensitive name match), in staff order. */
-export async function browseArtist(artist: string, limit?: number, offset = 0): Promise<TrackPage> {
+/** All tracks by an artist (case-insensitive name match). Defaults to newest. */
+export async function browseArtist(
+  artist: string,
+  limit?: number,
+  offset = 0,
+  sort: SortKey = "newest",
+): Promise<TrackPage> {
   const q = (artist ?? "").trim().toLowerCase();
-  if (!q) return paginate([], limit, offset);
+  if (!q) return { ...paginate([], limit, offset), sort };
   const entries = await getIndex();
   // Exact name match first (split the comma-joined multi-artist field), so
   // "li" doesn't pull in "Limujii"/"Charlie". Fall back to substring only for
@@ -391,19 +456,20 @@ export async function browseArtist(artist: string, limit?: number, offset = 0): 
   if (matches.length === 0 && q.length >= 3) {
     matches = entries.filter((e) => e.artistLc.includes(q));
   }
-  return paginate(matches, limit, offset);
+  return { ...paginate(sortEntries(matches, sort), limit, offset), sort };
 }
 
-/** All tracks in a category (Genre / Mood / Video), in staff order. */
+/** All tracks in a category (Genre / Mood / Video). Defaults to staff picks. */
 export async function browseCategory(
   category: string,
   limit?: number,
   offset = 0,
+  sort: SortKey = "staff",
 ): Promise<TrackPage> {
   const q = (category ?? "").trim().toLowerCase();
   const entries = await getIndex();
   const matches = q ? entries.filter((e) => e.catsLc.includes(q)) : [];
-  return paginate(matches, limit, offset);
+  return { ...paginate(sortEntries(matches, sort), limit, offset), sort };
 }
 
 /** Tracks similar to a given track id, using the API's /related model. */

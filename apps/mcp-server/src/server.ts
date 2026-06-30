@@ -105,6 +105,23 @@ const offsetArg = z
   .min(0)
   .optional()
   .describe("Skip this many results — for paging to the next page (the widget's Load more uses this).");
+// Sort orders mirror the freetouse.com dropdown. search_music also offers
+// "relevance" (best keyword match) and defaults to it; browse defaults differ.
+const searchSortArg = z
+  .enum(["relevance", "staff", "popular", "newest", "undiscovered"])
+  .optional()
+  .describe(
+    'Result order: "relevance" (best match — the default, leave unset), "staff" (curated), ' +
+      '"popular" (most downloads), "newest", "undiscovered" (fewest plays). The user can also ' +
+      "change this from the widget's sort dropdown.",
+  );
+const browseSortArg = z
+  .enum(["staff", "popular", "newest", "undiscovered"])
+  .optional()
+  .describe(
+    'Result order: "staff" (curated), "popular" (most downloads), "newest", "undiscovered" ' +
+      "(fewest plays). Leave unset for the default. The widget also exposes this as a dropdown.",
+  );
 
 interface MoreRef {
   tool: string;
@@ -142,8 +159,7 @@ function formatPage(heading: string, page: TrackPage): string {
 }
 
 // Dual-channel tool result: model-facing text + widget structuredContent.
-function pageResult(heading: string, page: TrackPage, more: MoreRef | null) {
-  const hasMore = page.offset + page.tracks.length < page.total;
+function pageResult(heading: string, page: TrackPage, more: MoreRef) {
   return {
     content: [{ type: "text" as const, text: formatPage(heading, page) }],
     structuredContent: {
@@ -152,7 +168,13 @@ function pageResult(heading: string, page: TrackPage, more: MoreRef | null) {
       offset: page.offset,
       limit: page.limit,
       total: page.total,
-      more: hasMore ? more : null,
+      // The applied ordering, so the widget's sort dropdown reflects it (null = no
+      // dropdown, e.g. find_similar).
+      sort: page.sort ?? null,
+      // Always present — the widget re-uses it for BOTH "Load more" (with an offset)
+      // and the sort dropdown (re-fetch with a new sort). The Load more button hides
+      // itself once everything is shown.
+      more,
     },
   };
 }
@@ -267,20 +289,25 @@ function buildServer(): McpServer {
           ),
         limit: limitArg,
         offset: offsetArg,
+        sort: searchSortArg,
       },
       _meta: widgetMeta,
     },
-    async ({ query, limit, offset }) =>
-      run("search_music", { query, limit, offset }, async () => {
+    async ({ query, limit, offset, sort }) =>
+      run("search_music", { query, limit, offset, sort }, async () => {
         const q = query ?? "";
-        const page = await searchMusic(q, limit, offset ?? 0);
+        const page = await searchMusic(q, limit, offset ?? 0, sort);
         // A query of only stopwords (e.g. "play some music") yields staff picks,
         // not a real search — label it honestly rather than "N results for …".
         const heading =
           q && hasUsableTerms(q)
             ? `Free To Use — ${page.total} result${plural(page.total)} for "${q}"`
             : "Free To Use — staff picks";
-        return { heading, page, more: { tool: "search_music", args: { query: q, limit: page.limit } } };
+        return {
+          heading,
+          page,
+          more: { tool: "search_music", args: { query: q, limit: page.limit, sort: page.sort } },
+        };
       }),
   );
 
@@ -328,14 +355,19 @@ function buildServer(): McpServer {
           .describe('Exact category name, e.g. "Lofi", "Happy", "Vlog". See list_categories.'),
         limit: limitArg,
         offset: offsetArg,
+        sort: browseSortArg,
       },
       _meta: widgetMeta,
     },
-    async ({ category, limit, offset }) =>
-      run("browse_category", { category, limit, offset }, async () => {
-        const page = await browseCategory(category, limit, offset ?? 0);
+    async ({ category, limit, offset, sort }) =>
+      run("browse_category", { category, limit, offset, sort }, async () => {
+        const page = await browseCategory(category, limit, offset ?? 0, sort);
         const heading = `Free To Use — ${page.total} "${category}" track${plural(page.total)}`;
-        return { heading, page, more: { tool: "browse_category", args: { category, limit: page.limit } } };
+        return {
+          heading,
+          page,
+          more: { tool: "browse_category", args: { category, limit: page.limit, sort: page.sort } },
+        };
       }),
   );
 
@@ -352,14 +384,19 @@ function buildServer(): McpServer {
         artist: z.string().describe('Artist name, e.g. "Pufino".'),
         limit: limitArg,
         offset: offsetArg,
+        sort: browseSortArg,
       },
       _meta: widgetMeta,
     },
-    async ({ artist, limit, offset }) =>
-      run("browse_artist", { artist, limit, offset }, async () => {
-        const page = await browseArtist(artist, limit, offset ?? 0);
+    async ({ artist, limit, offset, sort }) =>
+      run("browse_artist", { artist, limit, offset, sort }, async () => {
+        const page = await browseArtist(artist, limit, offset ?? 0, sort);
         const heading = `Free To Use — ${page.total} track${plural(page.total)} by ${artist}`;
-        return { heading, page, more: { tool: "browse_artist", args: { artist, limit: page.limit } } };
+        return {
+          heading,
+          page,
+          more: { tool: "browse_artist", args: { artist, limit: page.limit, sort: page.sort } },
+        };
       }),
   );
 
