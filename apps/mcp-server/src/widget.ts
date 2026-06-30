@@ -22,8 +22,12 @@ const CSS = `
   body { margin: 0; font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ftu-secondary); }
   /* Force Nunito with high specificity in case the host injects its own font. */
   .head, .title, .artist, .chip, .dur, .attr-title, .attr-desc, .attr-line { font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
-  .head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 4px 10px; }
-  .head { font-size: 13px; color: #8a8a8a; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Header row holds only the sort dropdown (the "N results for …" heading is
+     hidden as redundant with the chat response). Hidden entirely when there's no
+     sort to show. */
+  .head-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 8px 4px 10px; }
+  .head-row.hidden { display: none; }
+  .head { display: none; }
   /* Sort dropdown (top-right) — styled to match the Load more button: a fully
      rounded white pill with a soft shadow and a custom chevron (no OS arrow). */
   .sort { font-family: inherit; font-size: 12px; font-weight: 600; color: var(--ftu-secondary); background-color: #fff; border: 1px solid #ededed; border-radius: 999px; padding: 7px 30px 7px 15px; cursor: pointer; flex: none; max-width: 60%; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: background-color .15s ease, border-color .15s ease; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; }

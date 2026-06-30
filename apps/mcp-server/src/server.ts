@@ -80,13 +80,19 @@ const SERVER_INSTRUCTIONS = [
   "NARROW BEFORE SEARCHING — DO NOT GUESS THE MOOD. When a request is open-ended or a",
   'use-case ("music for a drone video", "a wedding", "a podcast intro", "my vlog") or a',
   'bare genre/mood ("lofi", "something chill", "upbeat"), STOP and ask the user 1-2 short',
-  "questions about the vibe (e.g. upbeat vs calm vs emotional/sad, energy/tempo, the feel",
-  "of the scene) and WAIT for their reply before searching. Never invent a mood on the",
-  "user's behalf and search anyway. Once they answer (or say to just pick, or the request",
+  "questions about the vibe. OFFER a few example directions to give them a starting point but",
+  'keep it OPEN — don\'t force a choice from a fixed list. e.g. "Should it feel upbeat and',
+  'energetic, calm and emotional, cinematic and epic — or something different? Describe the',
+  'vibe in your own words." Then WAIT for their reply. Never invent a mood and search anyway.',
+  "Once they answer (or say to just pick, or the request",
   "is already specific), call search_music ONCE with a concise query in THEIR words (a few",
   'distinct terms like "calm cinematic", never a long padded phrase). browse_category lists',
   "a whole genre/mood; browse_artist lists an artist's catalog; find_similar finds more",
   "like a given track.",
+  "",
+  "When you present tracks, briefly remind the user of the usage policy — Free To Use music is",
+  "free to use with attribution, and monetized/commercial use (or skipping attribution) may need",
+  "a license — and include the link: https://freetouse.com/usage-policy",
   "",
   "NEVER refuse to show tracks or say there are 'too many to display' — show the",
   "first page (results include a total and a Load more control). NEVER invent or",
@@ -155,9 +161,13 @@ function formatPage(heading: string, page: TrackPage): string {
     shown < total
       ? `\n\nShowing ${offset + 1}-${shown} of ${total}. Call the same tool with offset ${shown} for the next ${Math.min(limit, total - shown)}.`
       : "";
-  const credit =
-    '\n\nThese tracks are free to use with attribution. Credit each as: "Music track: <title> by <artist>, Source: https://freetouse.com/music".';
-  return `${heading}\n\n${body}${more}${credit}`;
+  const policy =
+    "\n\n**Using these tracks:** Free To Use music is free to use as long as you credit the track in " +
+    'your video description — "Music track: <title> by <artist>, Source: https://freetouse.com/music". ' +
+    "Monetized or commercial use, or using a track without attribution, may require a subscription or a " +
+    "single-track license. Remind the user to review the full usage policy: " +
+    "https://freetouse.com/usage-policy";
+  return `${heading}\n\n${body}${more}${policy}`;
 }
 
 // Encode the 0-100 waveform bars as a compact base64 string instead of an array
@@ -298,10 +308,12 @@ function buildServer(): McpServer {
         "FIRST, NARROW THE REQUEST — DO NOT GUESS. If the request is open-ended or a " +
         'use-case ("music for a drone video", "a wedding", "a podcast intro", "my vlog") ' +
         'or a bare genre/mood ("lofi", "something chill", "upbeat"), STOP and ask the user ' +
-        "1-2 short questions about the vibe before searching — e.g. the mood (upbeat / calm " +
-        "/ emotional / sad), the energy or tempo, and the feel of the scene — then WAIT for " +
-        "their reply. Only call this once the user has given their actual preferences (or " +
-        "explicitly says to just pick). Do not invent a mood on their behalf. " +
+        "1-2 short questions about the vibe before searching. Offer a few example directions to " +
+        "give them a starting point, but keep it OPEN — don't make them pick from a fixed list " +
+        '(e.g. "Should it feel upbeat and energetic, calm and emotional, cinematic — or something ' +
+        'different? Describe it in your own words."). Then WAIT for their reply. Only call this ' +
+        "once the user has given their actual preferences (or explicitly says to just pick). Do " +
+        "not invent a mood on their behalf. " +
         "Then call it ONCE with a CONCISE query built from THEIR words — a few distinct " +
         'terms like "calm cinematic" or "sad piano", NEVER a long padded phrase (do NOT ' +
         'send "positive atmospheric background music for drone video cinematic travel"). ' +

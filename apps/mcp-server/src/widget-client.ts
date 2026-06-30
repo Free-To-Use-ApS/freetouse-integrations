@@ -359,6 +359,8 @@ function seek(state: RowState, frac: number): void {
     pendingSeek = frac;
     setProgress(state, frac, false);
   }
+  // Clicking the scrubber resumes playback if the track was paused.
+  if (a.paused) a.play().catch(() => {});
 }
 
 // --- download (host-mediated) ----------------------------------------------
@@ -773,12 +775,17 @@ let sortWired = false;
 function configureSort(data: ResultData | null | undefined): void {
   const sel: any = document.getElementById("sort");
   if (!sel) return;
+  const headRow: any = sel.parentElement; // the .head-row (hidden when sort is)
   const tool = data && data.more && data.more.tool;
   const sort = data && data.sort;
-  if (!sort || !tool) {
+  const total = data && typeof data.total === "number" ? data.total : (data && data.tracks ? data.tracks.length : 0);
+  // Nothing worth sorting with 0-1 results, or no sort (find_similar).
+  if (!sort || !tool || total <= 1) {
     sel.classList.add("hidden");
+    if (headRow) headRow.classList.add("hidden");
     return;
   }
+  if (headRow) headRow.classList.remove("hidden");
   const args: any = (data && data.more && data.more.args) || {};
   const hasQuery = typeof args.query === "string" && args.query.trim().length > 0;
   const opts = sortOptionsFor(tool, hasQuery);
