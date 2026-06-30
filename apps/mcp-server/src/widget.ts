@@ -38,7 +38,7 @@ const CSS = `
   .vdiv { width: 1px; align-self: stretch; background: #ededed; flex: none; margin: 5px 0; }
 
   .meta { width: 108px; flex: none; min-width: 0; }
-  .title { font-weight: 800; font-size: 14px; line-height: 1.25; color: var(--ftu-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .title { font-weight: 800; font-size: 15px; line-height: 1.25; color: var(--ftu-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .artist { font-weight: 400; font-size: 11px; color: var(--ftu-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
 
   .chips { width: 76px; flex: none; display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; }
@@ -47,7 +47,6 @@ const CSS = `
   /* Cover, title, artist and chips link to freetouse.com (handled in JS). */
   .lnk { cursor: pointer; }
   .cover.lnk:hover { opacity: .9; }
-  .title.lnk:hover, .artist.lnk:hover { text-decoration: underline; }
   .chip.lnk:hover { background: #e6e6ec; color: #5f5f5f; }
   /* Premium indicator: a bookmark-star in the card's upper-right corner that pokes
      slightly ABOVE the frame (like freetouse.com). It sits clear above the download
