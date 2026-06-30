@@ -306,10 +306,14 @@ export function hasUsableTerms(query: string): boolean {
   return terms(query ?? "").length > 0;
 }
 
-function score(entry: IndexEntry, groups: string[][]): number {
-  let s = 0;
+// For one track, how many distinct query words it matches (`matches`) and the
+// summed strength of those matches (`weight`). Each word is credited once, at its
+// best-matching field. `matches` drives precision (keep tracks that satisfy the
+// MOST words); `weight` orders within a tier (title/artist beat tag beats genre).
+function scoreEntry(entry: IndexEntry, groups: string[][]): { matches: number; weight: number } {
+  let matches = 0;
+  let weight = 0;
   for (const variants of groups) {
-    // Credit each query word once, at the strength of its best-matching field.
     let best = 0;
     for (const t of variants) {
       let f = 0;
@@ -319,9 +323,10 @@ function score(entry: IndexEntry, groups: string[][]): number {
       else if (entry.genreLc.includes(t)) f = 2;
       if (f > best) best = f;
     }
-    s += best;
+    if (best > 0) matches++;
+    weight += best;
   }
-  return s;
+  return { matches, weight };
 }
 
 function strip(e: IndexEntry): UiTrack {
@@ -359,10 +364,17 @@ export async function searchMusic(query: string, limit?: number, offset = 0): Pr
   const entries = await getIndex();
   const ts = terms(query ?? "");
   if (ts.length === 0) return paginate(entries, limit, offset); // curated (staff order)
-  const ranked = entries
-    .map((e) => ({ e, s: score(e, ts) }))
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s || b.e.downloads - a.e.downloads)
+  const scored = entries
+    .map((e) => ({ e, ...scoreEntry(e, ts) }))
+    .filter((x) => x.matches > 0);
+  // Keep ONLY the tracks that satisfy the most query words, so a multi-word query
+  // intersects rather than unions: "lofi tracks by pufino" -> Pufino's lofi tracks,
+  // not every track matching "lofi" OR "pufino". (Single-word queries are
+  // unaffected — every match has matches=1.) Rank the kept tier by field strength.
+  const maxMatches = scored.reduce((m, x) => (x.matches > m ? x.matches : m), 0);
+  const ranked = scored
+    .filter((x) => x.matches === maxMatches)
+    .sort((a, b) => b.weight - a.weight || b.e.downloads - a.e.downloads)
     .map((x) => x.e);
   return paginate(ranked, limit, offset);
 }
