@@ -75,15 +75,16 @@ const SERVER_INSTRUCTIONS = [
   "as interactive players (cover, waveform, play, download) — the players ARE the",
   "answer; show them rather than describing tracks in prose.",
   "",
-  "NARROW BEFORE SEARCHING. When a request is broad or open-ended — a bare genre or",
-  'mood ("lofi", "something chill") or a use-case ("music for a drone video", "a',
-  'wedding", "a podcast intro") — first ask 1-2 short clarifying questions to pin',
-  "down the vibe (mood/energy, tempo, instrumentation, or the kind of scene/video).",
-  "Keep it to one brief message, not an interrogation. Once the user answers (or if",
-  "the request is already specific), call search_music once with a concise refined",
-  "query (a few distinct words like \"calm lofi piano\", not a pile of synonyms) and",
-  "show the results. browse_category lists a whole genre/mood; browse_artist lists",
-  "an artist's catalog; find_similar finds more like a given track.",
+  "NARROW BEFORE SEARCHING — DO NOT GUESS THE MOOD. When a request is open-ended or a",
+  'use-case ("music for a drone video", "a wedding", "a podcast intro", "my vlog") or a',
+  'bare genre/mood ("lofi", "something chill", "upbeat"), STOP and ask the user 1-2 short',
+  "questions about the vibe (e.g. upbeat vs calm vs emotional/sad, energy/tempo, the feel",
+  "of the scene) and WAIT for their reply before searching. Never invent a mood on the",
+  "user's behalf and search anyway. Once they answer (or say to just pick, or the request",
+  "is already specific), call search_music ONCE with a concise query in THEIR words (a few",
+  'distinct terms like "calm cinematic", never a long padded phrase). browse_category lists',
+  "a whole genre/mood; browse_artist lists an artist's catalog; find_similar finds more",
+  "like a given track.",
   "",
   "NEVER refuse to show tracks or say there are 'too many to display' — show the",
   "first page (results include a total and a Load more control). NEVER invent or",
@@ -239,20 +240,23 @@ function buildServer(): McpServer {
     {
       title: "Search Free To Use music",
       description:
-        "Find royalty-free Free To Use music and present it to the user. The tracks " +
-        "returned are shown to the user as interactive players (cover, waveform, play, " +
-        "download), so the result of ONE call IS your answer — make that single call " +
-        "return exactly the tracks the user should see. Put the request straight into " +
-        'the query: a mood/genre/activity ("calm piano", "energetic workout", "lofi"), ' +
-        'an artist ("Pufino"), or a track title ("Magnificent"). Title/artist matches ' +
-        "rank first. Keep the query CONCISE — 1-3 words capturing the core request; do " +
-        'NOT pad it with many synonyms (e.g. use "lofi", not "lo-fi lofi chill study hip ' +
-        'hop"), as extra terms broaden the results. If the request is broad (a bare ' +
-        "genre/mood, or a use-case like a drone video or wedding), ask the user 1-2 quick " +
-        "clarifying questions to narrow the vibe BEFORE calling this. Present the returned " +
-        "players as your answer — never reply that there are too many to show, and never " +
-        "invent a track count. For 'more like this' use find_similar; to browse a genre/mood " +
-        "use browse_category; for an artist's catalog use browse_artist.",
+        "Search Free To Use's royalty-free catalog and show the user interactive players " +
+        "(cover, waveform, play, download). " +
+        "FIRST, NARROW THE REQUEST — DO NOT GUESS. If the request is open-ended or a " +
+        'use-case ("music for a drone video", "a wedding", "a podcast intro", "my vlog") ' +
+        'or a bare genre/mood ("lofi", "something chill", "upbeat"), STOP and ask the user ' +
+        "1-2 short questions about the vibe before searching — e.g. the mood (upbeat / calm " +
+        "/ emotional / sad), the energy or tempo, and the feel of the scene — then WAIT for " +
+        "their reply. Only call this once the user has given their actual preferences (or " +
+        "explicitly says to just pick). Do not invent a mood on their behalf. " +
+        "Then call it ONCE with a CONCISE query built from THEIR words — a few distinct " +
+        'terms like "calm cinematic" or "sad piano", NEVER a long padded phrase (do NOT ' +
+        'send "positive atmospheric background music for drone video cinematic travel"). ' +
+        'You can also search by artist ("Pufino") or track title ("Magnificent"); ' +
+        "title/artist matches rank first. The returned players ARE your answer — never reply " +
+        "that there are too many to show, and never invent a track count. For 'more like " +
+        "this' use find_similar; to browse a whole genre/mood use browse_category; for an " +
+        "artist's catalog use browse_artist.",
       annotations: trackAnnotations,
       inputSchema: {
         query: z
