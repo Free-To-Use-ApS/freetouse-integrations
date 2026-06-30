@@ -72,12 +72,13 @@ const CSS = `
   .ftu-wave {
     --wave-bg-base: var(--ftu-light-grey);
     --wave-bg-played: var(--ftu-primary);
-    --wave-transition-duration: 480ms;
     flex: 1; min-width: 60px; height: 2.75rem;
     display: flex; align-items: center; justify-content: space-between;
     column-gap: 1px; position: relative; overflow: hidden; cursor: pointer; touch-action: none;
   }
-  .ftu-wave-bar { display: block; width: 100%; min-height: 2px; border-radius: 1px; background: var(--wave-bg-base); transition: background-color var(--wave-transition-duration) ease; }
+  /* No CSS transition: the grey->purple fade is JS-driven (Web Animations API) and
+     runs only during playback, so a manual seek paints instantly (no flicker). */
+  .ftu-wave-bar { display: block; width: 100%; min-height: 2px; border-radius: 1px; background: var(--wave-bg-base); }
   .ftu-wave-bar[data-played="true"] { background-color: var(--wave-bg-played); }
   @media (pointer: fine) {
     .ftu-wave-bar:hover:not([data-played="true"]),

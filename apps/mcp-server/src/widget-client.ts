@@ -144,16 +144,20 @@ let gen = 0;
 // Mark a bar played (purple, fading in) or unplayed (grey). The fade is driven by
 // the Web Animations API so it animates even where CSS transitions are frozen;
 // the [data-played] CSS rule still defines the resting colour after the fade.
-function paintBar(bar: any, played: boolean): void {
+function paintBar(bar: any, played: boolean, animate: boolean): void {
   if (!played) {
     bar.dataset.played = "";
     // Cancel any in-flight fade so a rewound bar reverts to grey immediately
-    // instead of finishing its grey->purple animation (which sits above the CSS).
+    // instead of finishing its grey->purple animation.
     try { bar.getAnimations().forEach((a: any) => a.cancel()); } catch (_e) {}
     return;
   }
   if (bar.dataset.played === "true") return;
   bar.dataset.played = "true";
+  // Fade in only as the playhead crosses a bar during playback. A manual seek
+  // (animate=false) jumps straight to the played colour — no fade, so it can't
+  // flicker against the instant hover-preview highlight.
+  if (!animate) return;
   try {
     bar.animate(
       [{ backgroundColor: WAVE_BASE }, { backgroundColor: WAVE_PLAYED }],
@@ -164,16 +168,16 @@ function paintBar(bar: any, played: boolean): void {
   }
 }
 
-function setProgress(state: RowState, frac: number): void {
+function setProgress(state: RowState, frac: number, animate: boolean): void {
   const n = state.bars.length;
   let idx = Math.floor(frac * n);
   if (idx >= n) idx = n - 1;
   if (idx < -1) idx = -1;
   if (idx === state.idx) return;
   if (idx > state.idx) {
-    for (let i = state.idx + 1; i <= idx; i++) paintBar(state.bars[i], true);
+    for (let i = state.idx + 1; i <= idx; i++) paintBar(state.bars[i], true, animate);
   } else {
-    for (let i = state.idx; i > idx; i--) paintBar(state.bars[i], false);
+    for (let i = state.idx; i > idx; i--) paintBar(state.bars[i], false, animate);
   }
   state.idx = idx;
 }
@@ -250,7 +254,7 @@ function wireAudioOnce(): void {
     }
   });
   a.addEventListener("timeupdate", () => {
-    if (active && a.duration) setProgress(active, a.currentTime / a.duration);
+    if (active && a.duration) setProgress(active, a.currentTime / a.duration, true);
   });
 }
 
@@ -298,16 +302,16 @@ function seek(state: RowState, frac: number): void {
     playTrack(state);
     pendingResume = null; // an explicit click position overrides the resume point
     pendingSeek = frac;
-    setProgress(state, frac);
+    setProgress(state, frac, false);
     return;
   }
   const a = audioEl();
   if (a.duration) {
     a.currentTime = frac * a.duration;
-    setProgress(state, frac);
+    setProgress(state, frac, false);
   } else {
     pendingSeek = frac;
-    setProgress(state, frac);
+    setProgress(state, frac, false);
   }
 }
 
