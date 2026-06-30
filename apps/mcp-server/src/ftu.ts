@@ -10,11 +10,14 @@
 // a premium flag.
 import {
   getCategories,
+  getCategoryTracks,
   getRelatedTracks,
   getTracks,
   waveformToGain,
   type Track,
   type Category,
+  type TrackOrder,
+  type SortDirection,
 } from "@freetouse/api";
 
 export interface UiTrack {
@@ -459,7 +462,28 @@ export async function browseArtist(
   return { ...paginate(sortEntries(matches, sort), limit, offset), sort };
 }
 
-/** All tracks in a category (Genre / Mood / Video). Defaults to staff picks. */
+// Map our sort keys to the FTU list-endpoint order params (so a category lists in
+// the same order as its page on freetouse.com — staff picks by default).
+function apiOrder(sort: SortKey): { order: TrackOrder; sort?: SortDirection } {
+  switch (sort) {
+    case "popular":
+      return { order: "downloads", sort: "desc" };
+    case "newest":
+      return { order: "release_date", sort: "desc" };
+    case "undiscovered":
+      return { order: "plays", sort: "asc" };
+    default:
+      return { order: "staff_order" }; // staff / relevance
+  }
+}
+
+/**
+ * All tracks in a category, via the API's own category-tracks endpoint — the same
+ * source (and ordering) as the freetouse.com category page. We can't filter the
+ * in-memory index by each track's `categories` field: that field is only a partial
+ * subset, so it severely undercounts (e.g. "Inspiring" shows 23 instead of 119).
+ * Defaults to staff picks.
+ */
 export async function browseCategory(
   category: string,
   limit?: number,
@@ -467,9 +491,27 @@ export async function browseCategory(
   sort: SortKey = "staff",
 ): Promise<TrackPage> {
   const q = (category ?? "").trim().toLowerCase();
-  const entries = await getIndex();
-  const matches = q ? entries.filter((e) => e.catsLc.includes(q)) : [];
-  return { ...paginate(sortEntries(matches, sort), limit, offset), sort };
+  const n = clampLimit(limit);
+  const start = Math.max(0, Math.floor(offset) || 0);
+  if (!q) return { tracks: [], total: 0, offset: start, limit: n, sort };
+  const cats = await categoriesList();
+  const cat = cats.find((c) => c.name.toLowerCase() === q) ?? cats.find((c) => c.name.toLowerCase().includes(q));
+  if (!cat) return { tracks: [], total: 0, offset: start, limit: n, sort };
+  const types = await categoryTypes();
+  const res = await getCategoryTracks(cat.id, { limit: n, offset: start, ...apiOrder(sort) });
+  const data = res.data ?? [];
+  // An empty page past the end means we've run out — report total = start so
+  // hasMore is false (mirrors findSimilar's pagination guard).
+  const total = data.length > 0 ? (res.pagination?.count ?? data.length) : start;
+  const tracks = data.flatMap((t) => {
+    try {
+      if (!t?.files?.mp3 || !t?.title) return [];
+      return [strip(toEntry(t, types))];
+    } catch {
+      return [];
+    }
+  });
+  return { tracks, total, offset: start, limit: n, sort };
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

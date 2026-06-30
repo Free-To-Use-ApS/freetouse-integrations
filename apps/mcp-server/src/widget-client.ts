@@ -463,9 +463,7 @@ function showAttribution(track: UiTrack): void {
   const desc = document.createElement("p");
   desc.className = "attr-desc";
   const em = document.createElement("em");
-  const strong = document.createElement("strong");
-  strong.textContent = `${title} by ${artist}`;
-  em.appendChild(strong);
+  em.textContent = `${title} by ${artist}`;
   desc.appendChild(em);
   desc.appendChild(
     document.createTextNode(
