@@ -33,14 +33,33 @@ const CODE_TTL = 10 * 60; // 10m
 // Signing secret. Set AUTH_SECRET in production (and share it across instances);
 // otherwise we generate an ephemeral one — fine for a single dev instance, but
 // every restart invalidates existing tokens.
-const AUTH_SECRET =
-  process.env.AUTH_SECRET ||
-  (() => {
-    console.warn(
-      "[auth] AUTH_SECRET not set — using an ephemeral secret. Set AUTH_SECRET in production so tokens survive restarts and work across instances.",
+//
+// In production we FAIL FAST rather than silently minting an ephemeral secret: an
+// ephemeral secret means every restart/instance signs tokens with a different key,
+// so hosts get seemingly-random 401s. A short secret is also rejected — HS256's
+// security rests entirely on the key's entropy, so we require ≥32 chars.
+const MIN_SECRET_LEN = 32;
+const AUTH_SECRET = ((): string => {
+  const set = process.env.AUTH_SECRET;
+  const isProd = process.env.NODE_ENV === "production";
+  if (set) {
+    if (set.length < MIN_SECRET_LEN) {
+      throw new Error(
+        `[auth] AUTH_SECRET is too short (${set.length} chars) — use at least ${MIN_SECRET_LEN} characters of high-entropy randomness (e.g. \`openssl rand -hex 32\`).`,
+      );
+    }
+    return set;
+  }
+  if (isProd) {
+    throw new Error(
+      "[auth] AUTH_SECRET is required in production. Set it to a shared, high-entropy secret (e.g. `openssl rand -hex 32`) so tokens survive restarts and validate across instances.",
     );
-    return randomBytes(32).toString("hex");
-  })();
+  }
+  console.warn(
+    "[auth] AUTH_SECRET not set — using an ephemeral secret. Set AUTH_SECRET in production so tokens survive restarts and work across instances.",
+  );
+  return randomBytes(32).toString("hex");
+})();
 
 // --- minimal HS256 JWT (no extra dependency) -------------------------------
 

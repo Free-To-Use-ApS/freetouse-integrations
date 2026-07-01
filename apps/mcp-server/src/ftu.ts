@@ -62,6 +62,8 @@ interface IndexEntry extends UiTrack {
   released: number;
   /** Curated staff_order — ascending is the "staff picks" sort. */
   staffOrder: number;
+  /** Has vocals/lyrics (the API `lyrics` field is a language code, or null). */
+  hasVocals: boolean;
   titleLc: string;
   artistLc: string;
   genreLc: string;
@@ -235,6 +237,7 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     plays: t.plays ?? 0,
     released: Date.parse(t.release_date ?? "") || 0,
     staffOrder: t.staff_order ?? 0,
+    hasVocals: t.lyrics != null,
     titleLc: title.toLowerCase(),
     artistLc: artist.toLowerCase(),
     genreLc: (t.genre ?? "").toLowerCase(),
@@ -246,15 +249,33 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
 // --- catalog index ----------------------------------------------------------
 
 const INDEX_TTL = 6 * 60 * 60 * 1000; // 6h
+const INDEX_RETRY_MS = 60 * 1000; // after a failed refresh, back off this long
 let indexCache: { entries: IndexEntry[]; expires: number } | null = null;
 let indexLoading: Promise<IndexEntry[]> | null = null;
+// Earliest time to attempt another COLD build (no cache yet) after a failure, so a
+// downed API at boot isn't hammered by a full fetch on every incoming request.
+let coldRetryAt = 0;
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts) await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
 
 async function buildIndex(): Promise<IndexEntry[]> {
   const types = await categoryTypes();
-  const res = await getTracks({ limit: 2000, order: "staff_order" });
+  // A transient 5xx on boot shouldn't leave a cold instance broken — retry briefly.
+  const res = await withRetry(() => getTracks({ limit: 2000, order: "staff_order" }));
   // Isolate per-track failures: one malformed record must not abort the whole
   // index. Skip entries missing the essentials (playable mp3, title).
-  return (res.data ?? []).flatMap((t) => {
+  const entries = (res.data ?? []).flatMap((t) => {
     try {
       if (!t?.files?.mp3 || !t?.title) return [];
       return [toEntry(t, types)];
@@ -262,25 +283,55 @@ async function buildIndex(): Promise<IndexEntry[]> {
       return [];
     }
   });
+  // An empty result means the upstream returned nothing usable (an empty 200 or an
+  // all-malformed page). Treat it as a transient failure — throw so it retries with
+  // backoff — rather than caching "empty" for the full 6h TTL and reporting ready.
+  if (entries.length === 0) throw new Error("catalog index built empty");
+  return entries;
 }
 
-async function getIndex(): Promise<IndexEntry[]> {
-  if (indexCache && indexCache.expires > Date.now()) return indexCache.entries;
+// Single-flight rebuild. On failure, keep serving the stale copy but push the next
+// attempt out so a downed API isn't hammered on every request.
+function refreshIndex(): Promise<IndexEntry[]> {
   if (indexLoading) return indexLoading;
   indexLoading = buildIndex()
     .then((entries) => {
       indexCache = { entries, expires: Date.now() + INDEX_TTL };
       return entries;
     })
+    .catch((e) => {
+      // Back off the next attempt: extend a warm cache's expiry so it keeps serving,
+      // or (cold, no cache) gate the next full rebuild behind coldRetryAt.
+      if (indexCache) indexCache.expires = Date.now() + INDEX_RETRY_MS;
+      else coldRetryAt = Date.now() + INDEX_RETRY_MS;
+      throw e;
+    })
     .finally(() => {
       indexLoading = null;
     });
-  try {
-    return await indexLoading;
-  } catch (e) {
-    if (indexCache) return indexCache.entries;
-    throw e;
+  return indexLoading;
+}
+
+async function getIndex(): Promise<IndexEntry[]> {
+  if (indexCache) {
+    // Stale-while-revalidate: serve the cached copy instantly and rebuild in the
+    // background once expired, so no single request eats a full rebuild.
+    if (indexCache.expires <= Date.now()) void refreshIndex().catch(() => {});
+    return indexCache.entries;
   }
+  // Cold start: a build is required. If a previous cold build just failed and we're
+  // still in the backoff window (and none is in flight), fail fast instead of firing
+  // a fresh full fetch at a downed API on every request.
+  if (!indexLoading && Date.now() < coldRetryAt) {
+    throw new Error("catalog index unavailable");
+  }
+  return refreshIndex();
+}
+
+/** True once the catalog index has loaded — used by the readiness check. A cached
+ *  index is never empty (buildIndex throws on empty), so "loaded" implies usable. */
+export function isIndexReady(): boolean {
+  return !!indexCache && indexCache.entries.length > 0;
 }
 
 /** Pre-warm the index at startup so the first request is instant. */
@@ -355,6 +406,7 @@ function strip(e: IndexEntry): UiTrack {
     plays: _p,
     released: _r,
     staffOrder: _so,
+    hasVocals: _hv,
     tagcat: _tc,
     titleLc: _t,
     artistLc: _a,
@@ -363,6 +415,32 @@ function strip(e: IndexEntry): UiTrack {
     ...ui
   } = e;
   return ui;
+}
+
+/**
+ * Optional discovery filters. Applied to a result set before pagination — the
+ * model can pass them when a user asks, but they're never shown in the widget.
+ */
+export interface Filters {
+  /** "instrumental" (no vocals) or "vocal" (has lyrics). */
+  vocals?: "instrumental" | "vocal";
+  minSeconds?: number;
+  maxSeconds?: number;
+}
+
+function hasFilters(f?: Filters): boolean {
+  return !!f && (f.vocals !== undefined || f.minSeconds !== undefined || f.maxSeconds !== undefined);
+}
+
+function applyFilters(entries: IndexEntry[], f?: Filters): IndexEntry[] {
+  if (!hasFilters(f)) return entries;
+  return entries.filter((e) => {
+    if (f!.vocals === "instrumental" && e.hasVocals) return false;
+    if (f!.vocals === "vocal" && !e.hasVocals) return false;
+    if (f!.minSeconds !== undefined && e.duration < f!.minSeconds) return false;
+    if (f!.maxSeconds !== undefined && e.duration > f!.maxSeconds) return false;
+    return true;
+  });
 }
 
 // Re-order a filtered result set by the chosen sort. "relevance" is handled by the
@@ -409,6 +487,7 @@ export async function searchMusic(
   limit?: number,
   offset = 0,
   sort: SortKey = "relevance",
+  filters?: Filters,
 ): Promise<TrackPage> {
   const entries = await getIndex();
   const ts = terms(query ?? "");
@@ -416,12 +495,10 @@ export async function searchMusic(
     // No real query: a curated list. Default to staff picks (the index's order);
     // honor an explicit popular/newest/undiscovered/staff choice if asked.
     const useStaff = sort === "relevance" || sort === "staff";
-    return {
-      ...paginate(useStaff ? entries : sortEntries(entries, sort), limit, offset),
-      sort: useStaff ? "staff" : sort,
-    };
+    const base = applyFilters(useStaff ? entries : sortEntries(entries, sort), filters);
+    return { ...paginate(base, limit, offset), sort: useStaff ? "staff" : sort };
   }
-  const scored = entries
+  const scored = applyFilters(entries, filters)
     .map((e) => ({ e, ...scoreEntry(e, ts) }))
     .filter((x) => x.matches > 0);
   // Keep ONLY the tracks that satisfy the most query words, so a multi-word query

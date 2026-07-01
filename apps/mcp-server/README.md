@@ -4,15 +4,22 @@ A remote [MCP](https://modelcontextprotocol.io) server that lets AI assistants
 (Claude, ChatGPT, and other MCP hosts) **find and play royalty-free Free To Use
 music** inside the chat.
 
-It exposes one tool, `search_music`, that:
+It exposes five read-only tools — `search_music` (by mood/genre/artist/title,
+with optional instrumental-vs-vocal and duration filters), `find_similar`,
+`browse_category`, `browse_artist`, and `list_categories`. Every track-returning
+tool:
 
 - **Always** returns a clean text list — each track with a few tags, a short
   description, and a **Listen & download** link. This is what hosts that don't
   render UI show today (e.g. Claude).
 - **Also** carries an inline **player widget** (cover art, tag chips, per-track
-  play) via the [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/)
+  play, waveform scrubber, download, light/dark theme) via the
+  [MCP Apps](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/)
   standard. Hosts that render UI (e.g. ChatGPT) show that instead. When a host
-  ships widget rendering, the **same tool lights up with no changes here**.
+  ships widget rendering, the **same tools light up with no changes here**.
+
+Submitting to a host directory? See [`DIRECTORY_LISTING.md`](DIRECTORY_LISTING.md)
+for ready-to-paste listing copy and a pre-submission checklist.
 
 ## How search works
 
@@ -56,7 +63,7 @@ settings. The tunnel URL changes each run, so update the connector URL each time
 |---------------|-------------------------|---------|
 | `PORT`        | `3000`                  | Listen port |
 | `PUBLIC_URL`  | `http://localhost:3000` | The address clients reach the server at. **Must** be the externally-visible URL (tunnel/host) because the OAuth discovery documents advertise absolute URLs. The `tunnel` script sets this automatically. |
-| `AUTH_SECRET` | _(random per start)_    | HMAC secret for signing JWT tokens. **Set this in production** (any long random string) so tokens survive restarts; share the same value across instances if you run more than one. If unset, a random secret is generated each start and existing tokens stop working on restart. |
+| `AUTH_SECRET` | _(random per start in dev)_ | HMAC secret for signing JWT tokens. **Required in production** (`NODE_ENV=production`): the server refuses to boot without it, and rejects secrets shorter than 32 chars — use e.g. `openssl rand -hex 32` and share the same value across instances. In dev (no `NODE_ENV`) a random secret is generated each start, so tokens stop working on restart. |
 
 ## Deploy
 
@@ -98,10 +105,12 @@ docker run -p 3000:3000 -e PUBLIC_URL="https://music-mcp.yourdomain.com" ftu-mcp
 
 ### Scaling note
 
-Sessions and OAuth tokens are held in memory, so this runs as a **single
-instance**. That's fine behind one host. For multiple replicas you'd move
-session/token state to a shared store (e.g. Redis) or switch to stateless
-(signed JWT) access tokens.
+OAuth client registrations and access/refresh tokens are **stateless signed
+JWTs** (see Authentication), so they survive restarts and validate on any
+instance sharing `AUTH_SECRET`. The only in-memory state is the live MCP
+transport **sessions** (one per connected client). A single instance handles
+this comfortably; to run multiple replicas, put them behind session-affinity
+(sticky) routing, or move the session map to a shared store.
 
 ## Authentication
 

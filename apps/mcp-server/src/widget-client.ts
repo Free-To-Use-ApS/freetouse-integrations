@@ -106,8 +106,12 @@ function decodePeaks(p: number[] | string | undefined): number[] {
 // solely on the CSS transition — some host iframes freeze/strip CSS transitions,
 // so driving the fade in JS makes the "fills in bar by bar" effect reliable.
 const WAVE_BASE = "#d1d1d1";
+const WAVE_BASE_DARK = "#4b4b54";
 const WAVE_PLAYED = "#7569de";
 const WAVE_FADE_MS = 480;
+// The grey a bar fades FROM — mirrors CSS --ftu-light-grey, swapped by applyTheme()
+// so the animated fade starts at the right resting colour in either theme.
+let waveBase = WAVE_BASE;
 
 const FALLBACK: ResultData = {
   heading: 'Free To Use — 1 result for "lofi"',
@@ -190,7 +194,7 @@ function paintBar(bar: any, played: boolean, animate: boolean): void {
   if (!animate) return;
   try {
     bar.animate(
-      [{ backgroundColor: WAVE_BASE }, { backgroundColor: WAVE_PLAYED }],
+      [{ backgroundColor: waveBase }, { backgroundColor: WAVE_PLAYED }],
       { duration: WAVE_FADE_MS, easing: "ease" },
     );
   } catch (_e) {
@@ -433,7 +437,10 @@ function showAttribution(track: UiTrack, anchor?: any): void {
   closeAttribution();
   const title = track.title || "This track";
   const artist = track.artist || "Free To Use";
-  const lines = [`Music track: ${title} by ${artist}`, "Source: https://freetouse.com/music"];
+  // Cite this exact track's page when we have it (freetouse.com's own attribution
+  // format), falling back to the generic music hub for the demo/fallback track.
+  const source = track.url || "https://freetouse.com/music";
+  const lines = [`Music track: ${title} by ${artist}`, `Source: ${source}`];
 
   const backdrop = document.createElement("div");
   backdrop.className = "attr-backdrop";
@@ -564,6 +571,40 @@ function linkTo(el: any, href?: string, label?: string): void {
   });
 }
 
+// --- theme ------------------------------------------------------------------
+
+// Follow the host's colour scheme, in priority order:
+//   1. ChatGPT Apps SDK — window.openai.theme ("light"/"dark"), re-broadcast via
+//      openai:set_globals.
+//   2. MCP Apps standard host — App.getHostContext().theme, re-broadcast via the
+//      "hostcontextchanged" event (only available once connect() resolves).
+//   3. OS preference — prefers-color-scheme (covers /preview and hosts that don't
+//      report a theme).
+// We set data-theme="dark" on <html> (the CSS switches all tokens) and swap the
+// waveform fade's start colour so the JS-driven grey->purple animation starts at
+// the right resting grey.
+function detectTheme(): "light" | "dark" {
+  const oa: any = (window as any).openai;
+  const ot = oa && (oa.theme || (oa.globals && oa.globals.theme));
+  if (ot === "dark" || ot === "light") return ot;
+  try {
+    const ht = appInstance && appInstance.getHostContext && appInstance.getHostContext();
+    if (ht && (ht.theme === "dark" || ht.theme === "light")) return ht.theme;
+  } catch (_e) {}
+  try {
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  } catch (_e) {}
+  return "light";
+}
+
+function applyTheme(): void {
+  const dark = detectTheme() === "dark";
+  const root = document.documentElement;
+  if (dark) root.setAttribute("data-theme", "dark");
+  else root.removeAttribute("data-theme");
+  waveBase = dark ? WAVE_BASE_DARK : WAVE_BASE;
+}
+
 // --- rendering --------------------------------------------------------------
 
 function buildRow(track: UiTrack): RowState {
@@ -683,13 +724,22 @@ function buildRow(track: UiTrack): RowState {
   clip.appendChild(body);
   el.appendChild(clip);
   // Premium tracks get a bookmark-star in the card's upper-right corner, poking
-  // slightly above the frame (matching freetouse.com), with a "Premium Track" tooltip.
+  // slightly above the frame (matching freetouse.com). When we know the track's
+  // page it links to that track's licensing page — informational, so a user who
+  // needs commercial rights can read the terms (not a checkout/transaction).
   if (track.premium) {
     const star = document.createElement("span");
     star.className = "premium-badge";
     star.innerHTML = PREMIUM;
-    star.title = "Premium Track";
-    star.setAttribute("aria-label", "Premium Track");
+    const licenseUrl = track.url ? track.url.replace(/\/+$/, "") + "/license" : "";
+    if (licenseUrl) {
+      star.classList.add("lnk");
+      star.title = "Premium track — view licensing";
+      linkTo(star, licenseUrl, `${track.title || "Track"} — premium, view licensing`);
+    } else {
+      star.title = "Premium track";
+      star.setAttribute("aria-label", "Premium track");
+    }
     el.appendChild(star);
   }
 
@@ -947,6 +997,18 @@ function renderToolOutput(): void {
 }
 
 function init(): void {
+  // Match the host colour scheme up front, then keep it in sync with host globals
+  // changes and OS-level scheme flips.
+  applyTheme();
+  window.addEventListener("openai:set_globals", applyTheme);
+  try {
+    const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq) {
+      if (mq.addEventListener) mq.addEventListener("change", applyTheme);
+      else if (mq.addListener) mq.addListener(applyTheme); // older Safari
+    }
+  } catch (_e) {}
+
   // 1) MCP Apps standard bridge (used for tool results AND host-mediated download).
   try {
     appInstance = new App({ name: "Free To Use", version: "0.1.0" });
@@ -954,8 +1016,14 @@ function init(): void {
       const sc = result && result.structuredContent;
       if (sc && sc.tracks) render(sc);
     };
+    // Re-apply the theme when the host's context changes (e.g. a dark/light toggle).
+    try {
+      if (appInstance.addEventListener) appInstance.addEventListener("hostcontextchanged", applyTheme);
+    } catch (_e) {}
     const c = appInstance.connect && appInstance.connect();
-    if (c && c.then) c.then(() => { appConnected = true; }).catch(() => {});
+    // getHostContext() only returns a theme once connected, so re-run applyTheme
+    // after the handshake resolves — that's when a standard host's theme lands.
+    if (c && c.then) c.then(() => { appConnected = true; applyTheme(); }).catch(() => {});
   } catch (_e) {
     /* not inside a standard MCP Apps host */
   }

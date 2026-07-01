@@ -20,12 +20,14 @@ import {
   resolveTrackRef,
   listCategories,
   hasUsableTerms,
+  isIndexReady,
   warmUp,
   formatDuration,
   DEFAULT_RESULTS,
   MAX_RESULTS,
   type TrackPage,
   type UiTrack,
+  type Filters,
 } from "./ftu.js";
 import { buildWidgetHtml } from "./widget.js";
 import { AnonymousJwtOAuthProvider } from "./auth.js";
@@ -111,6 +113,10 @@ const offsetArg = z
   .number()
   .int()
   .min(0)
+  // Cap well above the catalog size (~1.5k) so real paging is unaffected, but a
+  // bogus offset can't drive arbitrary out-of-range upstream requests in the
+  // tools that forward offset to the FTU API (browse_category, find_similar).
+  .max(100000)
   .optional()
   .describe("Skip this many results — for paging to the next page (the widget's Load more uses this).");
 // Sort orders mirror the freetouse.com dropdown. search_music also offers
@@ -130,6 +136,25 @@ const browseSortArg = z
     'Result order: "staff" (curated), "popular" (most downloads), "newest", "undiscovered" ' +
       "(fewest plays). Leave unset for the default. The widget also exposes this as a dropdown.",
   );
+// Optional discovery filters — pass only when the user actually asks for them.
+const vocalsArg = z
+  .enum(["instrumental", "vocal"])
+  .optional()
+  .describe('Filter to "instrumental" (no vocals/lyrics) or "vocal" — only when the user asks.');
+const minSecondsArg = z
+  .number()
+  .int()
+  .min(0)
+  .max(3600)
+  .optional()
+  .describe("Only tracks at least this many seconds long.");
+const maxSecondsArg = z
+  .number()
+  .int()
+  .min(1)
+  .max(3600)
+  .optional()
+  .describe("Only tracks at most this many seconds long (e.g. 30 for a short/Reel).");
 
 interface MoreRef {
   tool: string;
@@ -137,7 +162,9 @@ interface MoreRef {
 }
 
 function errorResult() {
-  return { content: [{ type: "text" as const, text: FRIENDLY_ERROR }] };
+  // isError distinguishes a real failure (API down) from a normal empty result, so
+  // the model can retry / not present the fallback text as a real answer.
+  return { content: [{ type: "text" as const, text: FRIENDLY_ERROR }], isError: true };
 }
 
 // Model-facing text for a page of tracks (also the fallback for hosts without a
@@ -151,7 +178,7 @@ function formatPage(heading: string, page: TrackPage): string {
     .map((t, i) => {
       const meta = [t.artist, t.genre, formatDuration(t.duration)].filter(Boolean).join(" · ");
       const premium = t.premium
-        ? "\n   ⚠️ Premium — tell the user this track needs an active subscription or a single-track license."
+        ? `\n   ⚠️ Premium — free with attribution, but commercial/monetized use needs a Free To Use subscription or a single-track license. License: ${t.url}/license`
         : "";
       return `${offset + i + 1}. **${t.title}** — ${meta}\n   ${t.description}${premium}\n   [Listen & download](${t.url})`;
     })
@@ -294,7 +321,15 @@ function buildServer(): McpServer {
   // results widget so hosts with UI render the players while hosts without UI
   // fall back to the model-facing text from formatPage().
   const trackAnnotations = { readOnlyHint: true, destructiveHint: false, openWorldHint: true };
-  const widgetMeta = { ui: { resourceUri: WIDGET_URI } };
+  const widgetMeta = {
+    ui: { resourceUri: WIDGET_URI },
+    // ChatGPT hints: a short widget summary + status strings shown while the tool runs.
+    "openai/widgetDescription":
+      "An inline list of Free To Use tracks with a mini player — play and scrub each track, " +
+      "download it, sort the list, and open tracks/artists on freetouse.com.",
+    "openai/toolInvocation/invoking": "Finding music…",
+    "openai/toolInvocation/invoked": "Here are some tracks",
+  };
 
   // search_music — the primary entry point.
   registerAppTool(
@@ -318,14 +353,17 @@ function buildServer(): McpServer {
         'terms like "calm cinematic" or "sad piano", NEVER a long padded phrase (do NOT ' +
         'send "positive atmospheric background music for drone video cinematic travel"). ' +
         'You can also search by artist ("Pufino") or track title ("Magnificent"); ' +
-        "title/artist matches rank first. The returned players ARE your answer — never reply " +
-        "that there are too many to show, and never invent a track count. For 'more like " +
+        "title/artist matches rank first. You can also narrow with vocals " +
+        "(instrumental/vocal) and min_seconds/max_seconds when the user asks (e.g. " +
+        '"instrumental lofi under 30 seconds"). The returned players ARE your answer — never ' +
+        "reply that there are too many to show, and never invent a track count. For 'more like " +
         "this' use find_similar; to browse a whole genre/mood use browse_category; for an " +
         "artist's catalog use browse_artist.",
       annotations: trackAnnotations,
       inputSchema: {
         query: z
           .string()
+          .max(200)
           .describe(
             'What to find — a mood/genre/activity ("upbeat corporate", "sad piano"), an ' +
               'artist ("Pufino"), or a track title ("Magnificent"). Empty = staff picks.',
@@ -333,23 +371,31 @@ function buildServer(): McpServer {
         limit: limitArg,
         offset: offsetArg,
         sort: searchSortArg,
+        vocals: vocalsArg,
+        min_seconds: minSecondsArg,
+        max_seconds: maxSecondsArg,
       },
       _meta: widgetMeta,
     },
-    async ({ query, limit, offset, sort }) =>
-      run("search_music", { query, limit, offset, sort }, async () => {
+    async ({ query, limit, offset, sort, vocals, min_seconds, max_seconds }) =>
+      run("search_music", { query, limit, offset, sort, vocals, min_seconds, max_seconds }, async () => {
         const q = query ?? "";
-        const page = await searchMusic(q, limit, offset ?? 0, sort);
+        const filters: Filters = { vocals, minSeconds: min_seconds, maxSeconds: max_seconds };
+        const page = await searchMusic(q, limit, offset ?? 0, sort, filters);
         // A query of only stopwords (e.g. "play some music") yields staff picks,
         // not a real search — label it honestly rather than "N results for …".
         const heading =
           q && hasUsableTerms(q)
             ? `Free To Use — ${page.total} result${plural(page.total)} for "${q}"`
             : "Free To Use — staff picks";
+        // Keep the filters in the pagination descriptor so Load more / re-sort preserve them.
         return {
           heading,
           page,
-          more: { tool: "search_music", args: { query: q, limit: page.limit, sort: page.sort } },
+          more: {
+            tool: "search_music",
+            args: { query: q, limit: page.limit, sort: page.sort, vocals, min_seconds, max_seconds },
+          },
         };
       }),
   );
@@ -418,6 +464,7 @@ function buildServer(): McpServer {
       inputSchema: {
         category: z
           .string()
+          .max(120)
           .describe('Exact category name, e.g. "Lofi", "Happy", "Vlog". See list_categories.'),
         limit: limitArg,
         offset: offsetArg,
@@ -447,7 +494,7 @@ function buildServer(): McpServer {
         "List all tracks by an artist (e.g. \"Pufino\", \"Lukrembo\"), shown to the user as players.",
       annotations: trackAnnotations,
       inputSchema: {
-        artist: z.string().describe('Artist name, e.g. "Pufino".'),
+        artist: z.string().max(120).describe('Artist name, e.g. "Pufino".'),
         limit: limitArg,
         offset: offsetArg,
         sort: browseSortArg,
@@ -549,7 +596,7 @@ const app = express();
 // Behind one proxy/tunnel/load balancer, so rate limiting keys on the real
 // client IP from X-Forwarded-For rather than the proxy's.
 app.set("trust proxy", 1);
-app.use(express.json());
+app.use(express.json({ limit: "64kb" }));
 
 // Abuse protection for the public MCP endpoint (the OAuth endpoints are already
 // rate-limited by the SDK). Generous enough for normal interactive use.
@@ -641,9 +688,12 @@ async function handleSession(req: Request, res: Response): Promise<void> {
 app.get("/mcp", requireAuth, handleSession);
 app.delete("/mcp", requireAuth, handleSession);
 
-// Health check for uptime monitors / load balancers.
+// Health check for uptime monitors / load balancers. 503 until the catalog index
+// has loaded, so the platform doesn't route traffic to an instance that can't yet
+// serve real results.
 app.get("/healthz", (_req: Request, res: Response) => {
-  res.json({ ok: true });
+  const ready = isIndexReady();
+  res.status(ready ? 200 : 503).json({ ok: ready, index: ready ? "ready" : "loading" });
 });
 
 // Privacy policy — required for ChatGPT / Claude directory submission.
