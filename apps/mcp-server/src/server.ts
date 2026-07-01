@@ -176,7 +176,10 @@ function formatPage(heading: string, page: TrackPage): string {
   }
   const body = tracks
     .map((t, i) => {
-      const meta = [t.artist, t.genre, formatDuration(t.duration)].filter(Boolean).join(" · ");
+      // Show the first couple of tags/categories (the descriptive pills) rather than the
+      // raw `genre` field, which is a distribution/DSP label and not very meaningful.
+      const descriptors = (t.chips ?? []).slice(0, 2).map((c) => c.label).join(", ");
+      const meta = [t.artist, descriptors || null, formatDuration(t.duration)].filter(Boolean).join(" · ");
       const premium = t.premium
         ? `\n   ⚠️ Premium — free with attribution, but commercial/monetized use needs a Free To Use subscription or a single-track license. License: ${t.url}/license`
         : "";
