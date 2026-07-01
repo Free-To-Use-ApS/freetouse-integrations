@@ -786,6 +786,45 @@ function loadBrandFont(): void {
   }
 }
 
+// --- waveform layout --------------------------------------------------------
+
+// Give each bar an explicit width snapped to whole DEVICE pixels, spreading the leftover
+// pixels EVENLY across bars (never clustered). Letting flex size 80 fluid bars lets
+// sub-pixel rounding accumulate and bunch toward one end — visibly widening the gaps
+// there on some hosts (hi-dpi / certain widths). With integer-device bar widths and a
+// matching integer-device gap, every painted gap is identical regardless of container
+// width or device-pixel ratio (a fractional container origin shifts all bars equally).
+function layoutWaveBars(waveEl: any, bars: any[]): void {
+  const n = bars.length;
+  if (!n) return;
+  const dpr = (window as any).devicePixelRatio || 1;
+  const rect = waveEl.getBoundingClientRect();
+  const cs = getComputedStyle(waveEl);
+  const inner = rect.width - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  const contentDev = Math.round(inner * dpr);
+  if (contentDev < n) return; // not laid out yet, or too narrow to bother
+  if (waveEl.__lcd === contentDev && waveEl.__ldpr === dpr) return; // unchanged
+  waveEl.__lcd = contentDev;
+  waveEl.__ldpr = dpr;
+
+  const gapDev = Math.max(1, Math.round(dpr)); // 1 CSS px gap, in device px
+  const barsDev = Math.max(n, contentDev - gapDev * (n - 1));
+  const base = Math.floor(barsDev / n);
+  const extra = barsDev - base * n; // 0..n-1 leftover device px, spread below
+  waveEl.style.columnGap = gapDev / dpr + "px";
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    acc += extra;
+    let w = base;
+    if (acc >= n) {
+      w += 1;
+      acc -= n;
+    }
+    bars[i].style.flex = "0 0 auto";
+    bars[i].style.width = w / dpr + "px";
+  }
+}
+
 // --- rendering --------------------------------------------------------------
 
 function buildRow(track: UiTrack): RowState {
@@ -866,6 +905,18 @@ function buildRow(track: UiTrack): RowState {
     waveEl.appendChild(b);
     bars.push(b);
   });
+  // Snap bar widths to whole device pixels once the wave is laid out, and again whenever
+  // it resizes, so the gaps stay perfectly uniform end-to-end (see layoutWaveBars).
+  // Snap once after the next frame (initial layout), and keep the observer reference on
+  // the element so it isn't garbage-collected and stops firing.
+  requestAnimationFrame(() => layoutWaveBars(waveEl, bars));
+  try {
+    const ro = new (window as any).ResizeObserver(() => layoutWaveBars(waveEl, bars));
+    ro.observe(waveEl);
+    waveEl.__ro = ro;
+  } catch (_e) {
+    /* no ResizeObserver — the rAF snap above still covers the initial layout */
+  }
 
   const durEl = document.createElement("div");
   durEl.className = "dur";
