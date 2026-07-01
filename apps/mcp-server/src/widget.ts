@@ -126,18 +126,14 @@ const CSS = `
 
   /* Visible keyboard focus for every interactive element. */
   .ftu-wave:focus-visible, .lnk:focus-visible, .play:focus-visible, .dl:focus-visible,
-  .loadmore:focus-visible, .sort:focus-visible {
+  .license:focus-visible, .loadmore:focus-visible, .sort:focus-visible {
     outline: 2px solid var(--ftu-primary); outline-offset: 2px;
   }
   /* Premium indicator: a bookmark-star in the card's upper-right corner that pokes
-     slightly ABOVE the frame (like freetouse.com). It sits clear above the download
-     button so it never blocks the button, and stays hoverable for the "Premium
-     Track" tooltip (hence no pointer-events:none). */
+     slightly ABOVE the frame (like freetouse.com). Purely a visual flag — the
+     licensing action lives on the per-track "Get a license" bag button in the row. */
   .premium-badge { position: absolute; top: -1.5px; right: 8px; z-index: 2; display: flex; align-items: center; line-height: 0; color: var(--ftu-primary); cursor: default; }
   .premium-badge svg { width: 16px; height: 16px; fill: currentColor; }
-  /* When the badge links to the track's licensing page it becomes clickable. */
-  .premium-badge.lnk { cursor: pointer; }
-  .premium-badge.lnk:hover { color: var(--ftu-primary-hover); }
 
   /* Load more: a small, neutral (near-black) button tucked into the lower right,
      echoing the player cards (white, hairline border, soft shadow). */
@@ -174,9 +170,15 @@ const CSS = `
   }
 
   .dur { flex: none; font-size: 9px; font-weight: 400; color: var(--text-muted); background: var(--surface-2); border-radius: 6px; padding: 3px 7px; font-variant-numeric: tabular-nums; }
-  .dl { flex: none; width: 34px; height: 34px; margin: 0 4px; border: none; background: none; color: var(--text-faint); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  /* Row actions: the "Get a license" bag and the download, sharing one look. They
+     sit as a tight pair at the right of the card (a small negative gap so the body's
+     flex gap doesn't push them apart). */
+  .dl, .license { flex: none; width: 32px; height: 34px; border: none; background: none; color: var(--text-faint); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .license { margin-right: -4px; }
+  .dl { margin-right: 2px; }
   .dl svg { width: 22px; height: 22px; fill: currentColor; }
-  .dl:hover { color: var(--ftu-primary-hover); }
+  .license svg { width: 20px; height: 20px; fill: currentColor; }
+  .dl:hover, .license:hover { color: var(--ftu-primary-hover); }
 `;
 
 const BODY = `

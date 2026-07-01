@@ -72,6 +72,12 @@ const PREMIUM =
   '<svg viewBox="0 0 16 16">' +
   '<path fill-rule="evenodd" d="M2 15.5V2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.74.439L8 13.069l-5.26 2.87A.5.5 0 0 1 2 15.5M8.16 4.1a.178.178 0 0 0-.32 0l-.634 1.285a.18.18 0 0 1-.134.098l-1.42.206a.178.178 0 0 0-.098.303L6.58 7.286a.18.18 0 0 1 .051.158L6.3 8.858a.178.178 0 0 0 .258.187l1.27-.668a.18.18 0 0 1 .165 0l1.27.668a.178.178 0 0 0 .257-.187L9.27 7.444a.18.18 0 0 1 .05-.158l1.028-1.001a.178.178 0 0 0-.098-.303l-1.42-.206a.18.18 0 0 1-.134-.098z"></path>' +
   "</svg>";
+// Shopping-bag "Get a license" icon (outline bag, matches the Canva app's
+// LicenseBagIcon). Links to the track's freetouse.com licensing page.
+const BAG =
+  '<svg viewBox="0 0 16 16">' +
+  '<path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-1v-.5a1.5 1.5 0 0 0-3 0V4h-1v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"></path>' +
+  "</svg>";
 // Attribution-modal glyphs (close, copy, copied-check).
 const CLOSE_ICON =
   '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
@@ -690,6 +696,22 @@ function buildRow(track: UiTrack): RowState {
   durEl.className = "dur";
   durEl.textContent = fmt(track.duration);
 
+  // "Get a license" bag — opens this track's freetouse.com licensing page (for
+  // commercial / no-attribution use). Shown for every track that has a page.
+  const licenseUrl = track.url ? track.url.replace(/\/+$/, "") + "/license" : "";
+  let licenseBtn: any = null;
+  if (licenseUrl) {
+    licenseBtn = document.createElement("button");
+    licenseBtn.className = "license";
+    licenseBtn.innerHTML = BAG;
+    licenseBtn.title = "Get a license";
+    licenseBtn.setAttribute("aria-label", "Get a license for " + (track.title || "this track"));
+    licenseBtn.addEventListener("click", (e: any) => {
+      e.stopPropagation();
+      openHref(licenseUrl);
+    });
+  }
+
   const dlBtn = document.createElement("button");
   dlBtn.className = "dl";
   dlBtn.innerHTML = DL;
@@ -701,8 +723,8 @@ function buildRow(track: UiTrack): RowState {
     return d;
   };
   // Cover sits flush against the card's left edge (no divider after it). Every-
-  // thing else lives in a padded body: meta | chips | play | wave | dur | dl,
-  // with dividers around the chips and before the download.
+  // thing else lives in a padded body: meta | chips | play | wave | dur | license | dl,
+  // with dividers around the chips and before the license/download action pair.
   const body = document.createElement("div");
   body.className = "body";
   body.appendChild(meta);
@@ -715,6 +737,7 @@ function buildRow(track: UiTrack): RowState {
   body.appendChild(waveEl);
   body.appendChild(durEl);
   body.appendChild(vdiv());
+  if (licenseBtn) body.appendChild(licenseBtn);
   body.appendChild(dlBtn);
   // The framed/clipped card. The badge lives outside it (directly on .player) so
   // it can poke slightly above the top edge without being clipped.
@@ -724,22 +747,14 @@ function buildRow(track: UiTrack): RowState {
   clip.appendChild(body);
   el.appendChild(clip);
   // Premium tracks get a bookmark-star in the card's upper-right corner, poking
-  // slightly above the frame (matching freetouse.com). When we know the track's
-  // page it links to that track's licensing page — informational, so a user who
-  // needs commercial rights can read the terms (not a checkout/transaction).
+  // slightly above the frame (matching freetouse.com). It's purely a visual flag;
+  // the licensing action lives on the row's "Get a license" bag button.
   if (track.premium) {
     const star = document.createElement("span");
     star.className = "premium-badge";
     star.innerHTML = PREMIUM;
-    const licenseUrl = track.url ? track.url.replace(/\/+$/, "") + "/license" : "";
-    if (licenseUrl) {
-      star.classList.add("lnk");
-      star.title = "Premium track — view licensing";
-      linkTo(star, licenseUrl, `${track.title || "Track"} — premium, view licensing`);
-    } else {
-      star.title = "Premium track";
-      star.setAttribute("aria-label", "Premium track");
-    }
+    star.title = "Premium track";
+    star.setAttribute("aria-label", "Premium track");
     el.appendChild(star);
   }
 
