@@ -21,6 +21,21 @@ import {
 import { useAttributionModal } from "../hooks/useAttributionModal";
 import { getArtistNames } from "../utils/format";
 
+/**
+ * A tiny silent WAV. We feed this to the AudioCard's `audioPreviewUrl` instead
+ * of the real mp3 because the card's own audio is never used — its play button
+ * is hidden and playback runs through our seekable engine (which loads
+ * `track.files.mp3` directly). The Kit card does `new Audio(audioPreviewUrl)`
+ * with the browser default preload="auto", i.e. it downloads the FULL mp3 for
+ * every card on mount; with ~20 cards remounted on every search that was
+ * hundreds of MB of wasted, uncancelled downloads — the cause of the search
+ * lag/near-crash. A data URI loads inline (no network) and keeps the card's
+ * displayed duration (which comes from the durationInSeconds prop, not the
+ * audio) intact.
+ */
+const SILENT_AUDIO =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+
 function capitalize(s: string): string {
   return s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1);
 }
@@ -135,7 +150,7 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
         title={track.title}
         description={artist}
         durationInSeconds={track.duration}
-        audioPreviewUrl={track.files.mp3}
+        audioPreviewUrl={SILENT_AUDIO}
         thumbnailUrl={track.thumbnails.sm}
         ariaLabel={intl.formatMessage(
           {

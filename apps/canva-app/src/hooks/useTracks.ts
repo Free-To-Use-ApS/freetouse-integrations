@@ -91,7 +91,11 @@ export function useTracks(
     abortRef.current = controller;
 
     setLoading(true);
-    setTracks([]);
+    // Don't clear the list here: emptying it flips TrackList to the skeleton,
+    // which unmounts and then remounts every AudioCard on each search. Keep the
+    // current results visible until the new ones arrive, so overlapping rows
+    // reconcile instead of churning. (Skeleton still shows on first load, when
+    // the list is genuinely empty.)
     offsetRef.current = 0;
 
     // Use override limit if set (for restoring scroll position)
@@ -115,9 +119,14 @@ export function useTracks(
 
   const loadMore = useCallback(() => {
     const offset = offsetRef.current;
+    // Bind to the current fetch controller so a query/category/related change
+    // (which aborts it) discards an in-flight "load more" instead of appending
+    // stale rows to a list that has since been replaced.
+    const controller = abortRef.current;
     setLoading(true);
 
     fetchTracks(query, categoryId, relatedToId, offset).then((res) => {
+      if (controller?.signal.aborted) return;
       setTracks((prev) => [...prev, ...(res.data as Track[])]);
       offsetRef.current = offset + res.data.length;
       setHasMore(res.data.length >= PAGE_SIZE);
