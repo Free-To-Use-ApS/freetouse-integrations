@@ -621,7 +621,15 @@ export async function browseCategory(
   if (!q) return { tracks: [], total: 0, offset: start, limit: n, sort };
   const cats = await categoriesList();
   const cat = cats.find((c) => c.name.toLowerCase() === q) ?? cats.find((c) => c.name.toLowerCase().includes(q));
-  if (!cat) return { tracks: [], total: 0, offset: start, limit: n, sort };
+  if (!cat) {
+    // Not a real category name — e.g. "Moody" is a free-form tag, not a browseable
+    // category. The model naturally tries plausible descriptors, so fall back to a
+    // keyword search instead of a "0 tracks" dead-end. Keep the reported sort
+    // browse-valid (search's "relevance" isn't in browse_category's schema) so the
+    // widget's Load more / sort re-fetch stay valid.
+    const page = await searchMusic(category, limit, start, sort === "staff" ? "relevance" : sort);
+    return { ...page, sort };
+  }
   const types = await categoryTypes();
   const res = await getCategoryTracks(cat.id, { limit: n, offset: start, ...apiOrder(sort) });
   const data = res.data ?? [];
