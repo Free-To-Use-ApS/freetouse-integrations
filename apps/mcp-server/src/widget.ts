@@ -153,12 +153,16 @@ const CSS = `
     --wave-bg-base: var(--ftu-light-grey);
     --wave-bg-played: var(--ftu-primary);
     flex: 1; min-width: 60px; height: 2.75rem;
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center;
     column-gap: 1px; position: relative; overflow: hidden; cursor: pointer; touch-action: none;
   }
-  /* No CSS transition: the grey->purple fade is JS-driven (Web Animations API) and
-     runs only during playback, so a manual seek paints instantly (no flicker). */
-  .ftu-wave-bar { display: block; width: 100%; min-height: 2px; border-radius: 1px; background: var(--wave-bg-base); }
+  /* Bars grow equally from a zero basis (flex: 1 1 0) rather than shrinking from
+     width:100%; combined with dropping justify-content:space-between, this keeps the
+     1px gaps fixed and spreads the sub-pixel rounding evenly across bar widths instead
+     of letting it cluster toward the end (visible as widening gaps on hi-dpi screens).
+     No CSS transition: the grey->purple fade is JS-driven (WAAPI), so a seek paints
+     instantly. */
+  .ftu-wave-bar { flex: 1 1 0; min-width: 0; min-height: 2px; border-radius: 1px; background: var(--wave-bg-base); }
   .ftu-wave-bar[data-played="true"] { background-color: var(--wave-bg-played); }
   /* Hover-preview fill (mouse only), driven in JS via data-preview off the container so
      it has no dead zones. Kept separate from data-played so it never disturbs playback. */
