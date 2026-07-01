@@ -131,25 +131,57 @@ function downsamplePeaks(waveform: number[] | undefined, bars: number): number[]
   return out;
 }
 
-function describe(
-  genre: string | null,
-  cats: string[],
-  tags: string[],
-  types: Map<string, string>,
-): string {
-  const moods = cats.filter((c) => types.get(c) === "Mood");
-  const genreCats = cats.filter((c) => types.get(c) === "Genre");
-  const uses = cats.filter((c) => types.get(c) === "Video");
+// A one-sentence blurb built from ALL of a track's descriptive metadata — its
+// Mood / Genre / Video categories plus free-form tags — deduped so nothing repeats:
+//   "{moods} {style} track with {remaining descriptors} vibes, great for {uses} videos."
+// The style noun is a Genre category, or (failing that) the first descriptive tag. The
+// raw `genre` DSP field is intentionally ignored: it's a distribution label that often
+// misdescribes the track (e.g. a sad piano piece filed under "Electronic").
+function describe(cats: string[], tags: string[], types: Map<string, string>): string {
+  const lc = (s: string) => s.trim().toLowerCase();
+  const uniq = (arr: string[]): string[] => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const x of arr) {
+      const k = lc(x);
+      if (k && !seen.has(k)) {
+        seen.add(k);
+        out.push(k);
+      }
+    }
+    return out;
+  };
+  // Prose list join: "a", "a and b", "a, b and c".
+  const prose = (arr: string[]): string =>
+    arr.length <= 1 ? arr[0] ?? "" : `${arr.slice(0, -1).join(", ")} and ${arr[arr.length - 1]}`;
 
-  const adj = moods[0];
-  const gen = genreCats[0] ?? genre ?? null;
-  const vibes = tags.slice(0, 3);
+  const moods = uniq(cats.filter((c) => types.get(c) === "Mood"));
+  const genreCats = uniq(cats.filter((c) => types.get(c) === "Genre"));
+  const uses = uniq(cats.filter((c) => types.get(c) === "Video"));
+  // Tags a category didn't already name (so "chill" isn't said twice).
+  const named = new Set([...moods, ...genreCats, ...uses]);
+  const extraTags = uniq(tags).filter((t) => !named.has(t));
 
-  let s = adj ? `${cap(adj.toLowerCase())} ` : "";
-  s += gen ? `${gen} track` : "track";
-  if (!adj) s = cap(s);
-  if (vibes.length) s += ` with ${vibes.join(", ")} vibes`;
-  if (uses.length) s += `, great for ${uses.slice(0, 2).join(" & ")} videos`;
+  // Style noun: a Genre category, else the first descriptive tag. The remaining genres
+  // and tags become "with … vibes" descriptors.
+  let style: string | undefined;
+  let rest: string[];
+  if (genreCats.length) {
+    style = genreCats[0];
+    rest = [...genreCats.slice(1), ...extraTags];
+  } else if (extraTags.length) {
+    style = extraTags[0];
+    rest = extraTags.slice(1);
+  } else {
+    rest = [];
+  }
+  const vibes = rest.slice(0, 4); // keep it a sentence, not a keyword dump
+
+  const core = style ? `${style} track` : "track";
+  let s = moods.length ? `${prose(moods)} ${core}` : core;
+  s = s.charAt(0).toUpperCase() + s.slice(1);
+  if (vibes.length) s += ` with ${prose(vibes)} vibes`;
+  if (uses.length) s += `, great for ${prose(uses)} videos`;
   return s + ".";
 }
 
@@ -227,7 +259,7 @@ function toEntry(t: Track, types: Map<string, string>): IndexEntry {
     artistUrl: `https://freetouse.com/music/${slug(firstArtist)}`,
     tags: tags.slice(0, 5),
     genre: t.genre,
-    description: describe(t.genre, cats, tags, types),
+    description: describe(cats, tags, types),
     gain: waveformToGain(t.waveform),
     peaks: downsamplePeaks(t.waveform, WAVE_BARS),
     chips,
