@@ -86,11 +86,24 @@ const SERVER_INSTRUCTIONS = [
   'keep it OPEN — don\'t force a choice from a fixed list. e.g. "Should it feel upbeat and',
   'energetic, calm and emotional, cinematic and epic — or something different? Describe the',
   'vibe in your own words." Then WAIT for their reply. Never invent a mood and search anyway.',
-  "Once they answer (or say to just pick, or the request",
-  "is already specific), call search_music ONCE with a concise query in THEIR words (a few",
-  'distinct terms like "calm cinematic", never a long padded phrase). browse_category lists',
-  "a whole genre/mood; browse_artist lists an artist's catalog; find_similar finds more",
-  "like a given track.",
+  "Once they answer (or say to just pick, or the request is already specific), make ONE tool",
+  "call and present that single set of players. Use a CONCISE, BROAD query — 1-3 mood/genre",
+  'words in THEIR words ("calm cinematic", "moody dark") so it returns PLENTY of tracks; never',
+  'a long padded phrase ("upbeat lively city browsing vlog"), which over-narrows to a handful.',
+  "",
+  "ONE SET OF PLAYERS PER REQUEST — this is important. Each tool call renders ANOTHER widget,",
+  "and the user wants a SINGLE window of curated tracks, not several. So: search ONCE, then",
+  "CURATE IN YOUR TEXT — point the user to the best fits from that one result set (e.g.",
+  '"Colourful and Vibe With You for the lively moments, City Life for slower stretches"). Do',
+  "NOT make follow-up searches to reach a count, gather 'a few more', or try another phrasing.",
+  "If the user asked for N tracks, don't set limit to N — search broadly (default limit) and",
+  "just NAME your top N from the single result set. Only if a search returns NO usable results",
+  "may you try ONE different query. For more/different tracks the user will ask, or use Load",
+  "more / the sort dropdown.",
+  "",
+  "Pick the SINGLE most fitting tool (each is also one window): search_music for a mood/genre/",
+  "activity, browse_category for a whole genre/mood, browse_artist for an artist's catalog,",
+  "find_similar for more like a given track.",
   "",
   "When you present tracks, briefly remind the user of the usage policy — Free To Use music is",
   "free to use with attribution, and monetized/commercial use (or skipping attribution) may need",
@@ -352,9 +365,15 @@ function buildServer(): McpServer {
         'different? Describe it in your own words."). Then WAIT for their reply. Only call this ' +
         "once the user has given their actual preferences (or explicitly says to just pick). Do " +
         "not invent a mood on their behalf. " +
-        "Then call it ONCE with a CONCISE query built from THEIR words — a few distinct " +
-        'terms like "calm cinematic" or "sad piano", NEVER a long padded phrase (do NOT ' +
-        'send "positive atmospheric background music for drone video cinematic travel"). ' +
+        "Then call it ONCE with a CONCISE, BROAD query built from THEIR words — a few distinct " +
+        'terms like "calm cinematic" or "sad piano", NEVER a long padded phrase (do NOT send ' +
+        '"positive atmospheric background music for drone video cinematic travel"), which ' +
+        "over-narrows to a handful. " +
+        "ONE SEARCH = ONE PLAYER WINDOW: each call renders another widget, and the user wants a " +
+        "SINGLE curated window, so do NOT search again to reach a count, gather more, or retry a " +
+        "different phrasing. If they asked for N tracks, don't set limit to N — search broadly " +
+        "and NAME your top N from this one result set in your text reply. Only if a search " +
+        "returns NO usable results may you try ONE different query. " +
         'You can also search by artist ("Pufino") or exact track title ("Magnificent"), ' +
         "which surface that artist/track first. You can also narrow with vocals " +
         "(instrumental/vocal) and min_seconds/max_seconds when the user asks (e.g. " +
