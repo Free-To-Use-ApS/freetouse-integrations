@@ -42,11 +42,13 @@ const CSS = `
      page). modal-open gives the body enough height for the fixed overlay to fit
      even on a short single-track widget. */
   body.modal-open { min-height: 252px; }
-  .attr-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; }
+  /* Transparent full-viewport layer — no dimming (a dark square looks out of place
+     in the otherwise-white chat), but it still catches a click-outside to close. */
+  .attr-backdrop { position: fixed; inset: 0; z-index: 100; }
   /* Absolutely positioned in the document; its top is set in JS to the downloaded
-     track's position, so it appears where the user clicked (not centered in a tall
-     widget that could scroll it out of view). */
-  .attr-modal { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: calc(100% - 32px); max-width: 430px; background: #fff; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.28); z-index: 101; }
+     track's position, so it appears where the user clicked. A strong shadow lifts
+     it off the (un-dimmed) content. */
+  .attr-modal { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: calc(100% - 32px); max-width: 430px; background: #fff; border: 1px solid #ececec; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 13px; box-shadow: 0 22px 55px rgba(0,0,0,.30), 0 8px 20px rgba(0,0,0,.16); z-index: 101; }
   .attr-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
   .attr-title { font-size: 17px; font-weight: 800; line-height: 1.2; color: var(--ftu-secondary); }
   .attr-close { flex: none; background: none; border: none; cursor: pointer; color: #9a9a9a; padding: 0; display: flex; align-items: center; margin-top: 2px; }
