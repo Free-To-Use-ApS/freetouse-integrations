@@ -704,8 +704,8 @@ function buildRow(track: UiTrack): RowState {
     licenseBtn = document.createElement("button");
     licenseBtn.className = "license";
     licenseBtn.innerHTML = BAG;
-    licenseBtn.title = "Buy license";
-    licenseBtn.setAttribute("aria-label", "Buy license for " + (track.title || "this track"));
+    licenseBtn.title = "Get a license";
+    licenseBtn.setAttribute("aria-label", "Get a license for " + (track.title || "this track"));
     licenseBtn.addEventListener("click", (e: any) => {
       e.stopPropagation();
       openHref(licenseUrl);
