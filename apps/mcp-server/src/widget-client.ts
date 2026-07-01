@@ -704,8 +704,8 @@ function buildRow(track: UiTrack): RowState {
     licenseBtn = document.createElement("button");
     licenseBtn.className = "license";
     licenseBtn.innerHTML = BAG;
-    licenseBtn.title = "Get a license";
-    licenseBtn.setAttribute("aria-label", "Get a license for " + (track.title || "this track"));
+    licenseBtn.title = "Buy license";
+    licenseBtn.setAttribute("aria-label", "Buy license for " + (track.title || "this track"));
     licenseBtn.addEventListener("click", (e: any) => {
       e.stopPropagation();
       openHref(licenseUrl);
@@ -715,6 +715,7 @@ function buildRow(track: UiTrack): RowState {
   const dlBtn = document.createElement("button");
   dlBtn.className = "dl";
   dlBtn.innerHTML = DL;
+  dlBtn.title = "Download";
   dlBtn.setAttribute("aria-label", "Download " + (track.title || ""));
 
   const vdiv = () => {
