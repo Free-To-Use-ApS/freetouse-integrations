@@ -72,11 +72,11 @@ const PREMIUM =
   '<svg viewBox="0 0 16 16">' +
   '<path fill-rule="evenodd" d="M2 15.5V2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.74.439L8 13.069l-5.26 2.87A.5.5 0 0 1 2 15.5M8.16 4.1a.178.178 0 0 0-.32 0l-.634 1.285a.18.18 0 0 1-.134.098l-1.42.206a.178.178 0 0 0-.098.303L6.58 7.286a.18.18 0 0 1 .051.158L6.3 8.858a.178.178 0 0 0 .258.187l1.27-.668a.18.18 0 0 1 .165 0l1.27.668a.178.178 0 0 0 .257-.187L9.27 7.444a.18.18 0 0 1 .05-.158l1.028-1.001a.178.178 0 0 0-.098-.303l-1.42-.206a.18.18 0 0 1-.134-.098z"></path>' +
   "</svg>";
-// Shopping-bag "Get a license" icon (outline bag, matches the Canva app's
-// LicenseBagIcon). Links to the track's freetouse.com licensing page.
+// Bootstrap Icons "bag" — the "Get a license" action. Links to the track's
+// freetouse.com licensing page. icons.getbootstrap.com/icons/bag
 const BAG =
   '<svg viewBox="0 0 16 16">' +
-  '<path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-1v-.5a1.5 1.5 0 0 0-3 0V4h-1v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"></path>' +
+  '<path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"></path>' +
   "</svg>";
 // Attribution-modal glyphs (close, copy, copied-check).
 const CLOSE_ICON =
