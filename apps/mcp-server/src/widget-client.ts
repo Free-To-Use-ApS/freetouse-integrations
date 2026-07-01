@@ -391,7 +391,8 @@ function fallbackDownload(track: UiTrack): void {
 // app here (not on the track page), pop the same attribution reminder the other
 // FTU apps show, so the user has the credit text to hand. Built client-side from
 // title+artist (matches the server's attribution format) — no extra payload.
-let attrEl: any = null;
+let attrBackdrop: any = null;
+let attrModal: any = null;
 
 function copyText(text: string): Promise<boolean> {
   try {
@@ -418,10 +419,8 @@ function fallbackCopy(text: string): boolean {
 }
 
 function closeAttribution(): void {
-  if (attrEl) {
-    try { attrEl.remove(); } catch (_e) {}
-    attrEl = null;
-  }
+  if (attrBackdrop) { try { attrBackdrop.remove(); } catch (_e) {} attrBackdrop = null; }
+  if (attrModal) { try { attrModal.remove(); } catch (_e) {} attrModal = null; }
   document.body.classList.remove("modal-open");
   document.removeEventListener("keydown", onAttrKey);
 }
@@ -430,7 +429,7 @@ function onAttrKey(e: any): void {
   if (e.key === "Escape") closeAttribution();
 }
 
-function showAttribution(track: UiTrack): void {
+function showAttribution(track: UiTrack, anchor?: any): void {
   closeAttribution();
   const title = track.title || "This track";
   const artist = track.artist || "Free To Use";
@@ -438,14 +437,13 @@ function showAttribution(track: UiTrack): void {
 
   const backdrop = document.createElement("div");
   backdrop.className = "attr-backdrop";
-  backdrop.setAttribute("role", "dialog");
-  backdrop.setAttribute("aria-modal", "true");
-  backdrop.setAttribute("aria-label", "Attribution is required");
   backdrop.addEventListener("click", closeAttribution);
 
   const modal = document.createElement("div");
   modal.className = "attr-modal";
-  modal.addEventListener("click", (e: any) => e.stopPropagation());
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", "Attribution is required");
 
   const head = document.createElement("div");
   head.className = "attr-head";
@@ -503,10 +501,25 @@ function showAttribution(track: UiTrack): void {
   modal.appendChild(head);
   modal.appendChild(desc);
   modal.appendChild(box);
-  backdrop.appendChild(modal);
+
+  // Anchor the modal to the row that was just downloaded, so it shows where the
+  // user clicked instead of centered in a (possibly very tall) widget.
+  let top = 16;
+  try {
+    if (anchor && anchor.getBoundingClientRect) {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+      top = Math.max(8, anchor.getBoundingClientRect().top + scrollTop);
+    }
+  } catch (_e) {}
+  modal.style.top = top + "px";
+
+  // Backdrop and modal are siblings on <body>: the backdrop dims the viewport,
+  // while the modal is absolutely positioned in the document near the track.
   document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
   document.body.classList.add("modal-open");
-  attrEl = backdrop;
+  attrBackdrop = backdrop;
+  attrModal = modal;
   document.addEventListener("keydown", onAttrKey);
   try { close.focus(); } catch (_e) {}
 }
@@ -687,7 +700,7 @@ function buildRow(track: UiTrack): RowState {
   // so the user gets the credit text without visiting the track page).
   dlBtn.addEventListener("click", () => {
     download(track);
-    showAttribution(track);
+    showAttribution(track, el);
   });
 
   // Click + drag to scrub (pointer capture so dragging works off the bar).
