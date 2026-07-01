@@ -314,32 +314,85 @@ function wireAudioOnce(): void {
   });
 }
 
-function playTrack(state: RowState): void {
-  const a = audioEl();
-  if (active === state) {
-    if (a.paused) a.play().catch(() => {});
-    else a.pause();
-    return;
+// Short fade to avoid the click/"blip" when a playing track is cut off — swapping the
+// <audio> src mid-sample pops. We ramp the element's volume down before switching and
+// up on the new track, instead of a full Web Audio graph (which can silence audio if a
+// sandboxed host suspends the AudioContext). Each track's per-track loudness gain is the
+// fade-in target so loud tracks still settle quieter.
+const FADE_MS = 60;
+let volRamp: any = null;
+
+function stopVolRamp(): void {
+  if (volRamp) {
+    clearInterval(volRamp);
+    volRamp = null;
   }
-  // Leaving the current track: remember its position and KEEP its fill purple, so
-  // the user can see what they've played and resume it later.
-  if (active) {
+}
+
+// Ramp audio.volume to `target` over FADE_MS, then run `done`. A new ramp cancels any
+// in-flight one, so a rapid re-click just abandons the previous (stale) switch.
+function rampVolume(target: number, done?: () => void): void {
+  const a = audioEl();
+  stopVolRamp();
+  const clamp = (v: number) => Math.max(0, Math.min(1, v));
+  const from = clamp(typeof a.volume === "number" ? a.volume : 1);
+  const to = clamp(target);
+  const t0 = performance.now();
+  volRamp = setInterval(() => {
+    const p = Math.min(1, (performance.now() - t0) / FADE_MS);
+    a.volume = from + (to - from) * p;
+    if (p >= 1) {
+      stopVolRamp();
+      a.volume = to;
+      if (done) done();
+    }
+  }, 12);
+}
+
+function gainFor(state: RowState): number {
+  const g = state.track.gain;
+  return typeof g === "number" ? Math.max(0, Math.min(1, g)) : 1;
+}
+
+// Switch playback to `state` from silence and fade it in. `seekFrac` (0-1) plays from
+// that position; otherwise the track resumes where it last left off. `active` only
+// changes here — after any fade-out — so progress/UI never briefly track the wrong row.
+function startTrack(state: RowState, seekFrac: number | null): void {
+  const a = audioEl();
+  if (active && active !== state) {
     if (isFinite(a.currentTime) && a.currentTime > 0) active.resumeTime = a.currentTime;
     setRowPlaying(active, false);
   }
   active = state;
-  pendingSeek = null;
-  // A finished track replays from the start (clear its fill); otherwise resume
-  // from where it last left off once the new track's metadata loads.
+  // A finished track replays from the start (clear its fill); otherwise resume later.
   if (state.completed) {
     resetRow(state);
     state.completed = false;
     state.resumeTime = 0;
   }
-  pendingResume = state.resumeTime > 0 ? state.resumeTime : null;
+  pendingSeek = seekFrac;
+  pendingResume = seekFrac == null && state.resumeTime > 0 ? state.resumeTime : null;
   a.src = state.track.mp3 || "";
-  a.volume = typeof state.track.gain === "number" ? state.track.gain : 1;
+  a.volume = 0;
   a.play().catch(() => {});
+  rampVolume(gainFor(state));
+}
+
+function playTrack(state: RowState): void {
+  const a = audioEl();
+  if (active === state) {
+    if (a.paused) {
+      a.play().catch(() => {});
+      rampVolume(gainFor(state));
+    } else {
+      rampVolume(0, () => { try { a.pause(); } catch (_e) {} });
+    }
+    return;
+  }
+  // Switching tracks: fade the current one out before swapping the source (so it isn't
+  // cut mid-sample), then start the new track from silence and fade it in.
+  if (active && !a.paused) rampVolume(0, () => startTrack(state, null));
+  else startTrack(state, null);
 }
 
 function fractionFromX(el: any, clientX: number): number {
@@ -355,9 +408,11 @@ function fractionFromX(el: any, clientX: number): number {
 
 function seek(state: RowState, frac: number): void {
   if (active !== state) {
-    playTrack(state);
-    pendingResume = null; // an explicit click position overrides the resume point
-    pendingSeek = frac;
+    // Switch to this track (fading the current one out first) and play from the clicked
+    // position — the explicit click position overrides any resume point.
+    const a = audioEl();
+    if (active && !a.paused) rampVolume(0, () => startTrack(state, frac));
+    else startTrack(state, frac);
     setProgress(state, frac, false);
     return;
   }
@@ -1114,8 +1169,10 @@ function render(data: ResultData | null | undefined): void {
   closeAttribution(); // don't leave a download modal hanging over fresh results
 
   const a = audioEl();
+  stopVolRamp();
   a.pause();
   a.removeAttribute("src");
+  a.volume = 1;
   active = null;
   pendingSeek = null;
 
