@@ -160,14 +160,9 @@ const CSS = `
      runs only during playback, so a manual seek paints instantly (no flicker). */
   .ftu-wave-bar { display: block; width: 100%; min-height: 2px; border-radius: 1px; background: var(--wave-bg-base); }
   .ftu-wave-bar[data-played="true"] { background-color: var(--wave-bg-played); }
-  @media (pointer: fine) {
-    .ftu-wave-bar:hover:not([data-played="true"]),
-    .ftu-wave-bar:has(~ .ftu-wave-bar:hover ~ .ftu-wave-bar[data-played="true"]),
-    .ftu-wave-bar:has(~ .ftu-wave-bar:hover):not(:has(~ .ftu-wave-bar[data-played="true"])) {
-      background: var(--wave-bg-played) !important;
-      transition: none !important;
-    }
-  }
+  /* Hover-preview fill (mouse only), driven in JS via data-preview off the container so
+     it has no dead zones. Kept separate from data-played so it never disturbs playback. */
+  .ftu-wave-bar[data-preview="true"]:not([data-played="true"]) { background-color: var(--wave-bg-played); }
 
   .dur { flex: none; font-size: 9px; font-weight: 400; color: var(--text-muted); background: var(--surface-2); border-radius: 6px; padding: 3px 7px; font-variant-numeric: tabular-nums; }
   /* Row actions: the "Get a license" bag and the download, sharing one look. They

@@ -373,26 +373,108 @@ function seek(state: RowState, frac: number): void {
   if (a.paused) a.play().catch(() => {});
 }
 
-// --- download (host-mediated) ----------------------------------------------
+// --- download ---------------------------------------------------------------
 
-function download(track: UiTrack): void {
-  if (!track.mp3) return;
-  const name = `${track.artist || "Free To Use"} - ${track.title || "track"} (freetouse.com).mp3`;
-  if (appInstance && appInstance.downloadFile) {
-    appInstance
-      .downloadFile({ contents: [{ type: "resource_link", uri: track.mp3, name, mimeType: "audio/mpeg" }] })
-      .catch(() => fallbackDownload(track));
-  } else {
-    fallbackDownload(track);
+// The mp3 origin (data.freetouse.com) hard-codes `Content-Disposition: filename=file.mp3`,
+// so any host that FETCHES the URL itself saves it as "file.mp3". To get the real
+// "{artist} - {title} (freetouse.com).mp3" we fetch the bytes ourselves (CORS is open)
+// and hand them off as data we own — the filename then can't be overridden by a header.
+function trackFileName(track: UiTrack): string {
+  const raw = `${track.artist || "Free To Use"} - ${track.title || "track"} (freetouse.com).mp3`;
+  // Strip characters that are illegal in filenames or would break the file:/// basename
+  // (e.g. an artist like "AC/DC" must not become the filename "DC.mp3").
+  return raw.replace(/[/\\:*?"<>|]/g, "-");
+}
+
+// Read a Blob as bare base64 (no data: prefix) for an embedded host download.
+function blobToBase64(blob: any): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = String(r.result || "");
+      const i = s.indexOf(",");
+      resolve(i >= 0 ? s.slice(i + 1) : "");
+    };
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+// Save an already-fetched blob via an <a download>. Because the blob is a same-origin
+// object URL, the browser honours the `download` filename (unlike a cross-origin URL).
+// Works in /preview and any iframe whose sandbox permits downloads.
+function anchorSave(blob: any, name: string): boolean {
+  try {
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = name;
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => { try { URL.revokeObjectURL(href); } catch (_e) {} }, 4000);
+    return true;
+  } catch (_e) {
+    return false;
   }
 }
 
-function fallbackDownload(track: UiTrack): void {
+// Cap on bytes we'll base64-inline into a host download message (postMessage payload).
+const EMBED_LIMIT = 20 * 1024 * 1024;
+
+async function download(track: UiTrack): Promise<void> {
+  if (!track.mp3) return;
+  const url = track.mp3;
+  const name = trackFileName(track);
+
+  // Fetch the bytes ourselves so we control the filename and can save even where the
+  // host iframe blocks a bare window.open. If it fails (offline/CORS) we degrade below.
+  let blob: any = null;
   try {
-    window.open(track.mp3 || track.url || "", "_blank");
+    const res = await fetch(url);
+    if (res.ok) blob = await res.blob();
   } catch (_e) {
-    /* ignore */
+    /* handled below */
   }
+
+  const caps =
+    appConnected && appInstance && appInstance.getHostCapabilities
+      ? appInstance.getHostCapabilities()
+      : null;
+
+  // In a real host that advertises the capability, hand the download to it in ONE call.
+  // Prefer an EMBEDDED resource (we own the bytes, so the host names the file from our uri
+  // basename — no Content-Disposition to override it); fall back to a resource_link only
+  // when we couldn't get the bytes. A RESOLVED promise means the host handled it — saved,
+  // OR the user cancelled / the host declined (isError). Either way we're done: we must NOT
+  // re-prompt or force-open the file, or cancelling would still trigger a download. Only a
+  // REJECTED promise (bridge timeout / lost connection) falls through to a widget-side save.
+  if (caps && caps.downloadFile && appInstance.downloadFile) {
+    try {
+      let contents: any = null;
+      if (blob && blob.size <= EMBED_LIMIT) {
+        const b64 = await blobToBase64(blob);
+        if (b64) {
+          contents = [{ type: "resource", resource: { uri: "file:///" + name, mimeType: "audio/mpeg", blob: b64 } }];
+        }
+      }
+      if (!contents) {
+        contents = [{ type: "resource_link", uri: url, name, mimeType: "audio/mpeg" }];
+      }
+      await appInstance.downloadFile({ contents });
+      return; // host received + resolved it (saved, or user cancelled / declined) — done
+    } catch (_e) {
+      /* rejected = the host bridge itself failed — fall through to a widget-side save */
+    }
+  }
+
+  // Not a download-capable host: outside a host (/preview) the same-origin blob anchor
+  // saves directly with the right name; inside a host without the capability an <a download>
+  // is usually sandbox-blocked, so open the mp3 through the host link bridge instead.
+  if (!appConnected && blob && anchorSave(blob, name)) return;
+  openHref(url);
 }
 
 // --- attribution modal (shown after an in-app download) --------------------
@@ -611,6 +693,44 @@ function applyTheme(): void {
   waveBase = dark ? WAVE_BASE_DARK : WAVE_BASE;
 }
 
+// --- brand font (CSP-proof) --------------------------------------------------
+
+// Nunito ships as a base64 @font-face (see fonts.ts). That works only where the host
+// iframe's CSP allows `data:` in font-src — ChatGPT does, but the MCP Apps standard host
+// (Claude) derives font-src from ui.csp.resourceDomains, which is origins-only, so `data:`
+// is dropped and the widget falls back to a system font. Registering the SAME bytes via the
+// FontFace API from an ArrayBuffer performs no URL fetch, so it isn't governed by font-src
+// and loads everywhere. We reuse the base64 already inlined in the stylesheet (no duplicated
+// payload); on any failure the CSS @font-face still covers permissive hosts.
+function loadBrandFont(): void {
+  try {
+    const w: any = window as any;
+    if (!w.FontFace || !document.fonts || !document.fonts.add) return;
+    let b64 = "";
+    const sheets: any = document.styleSheets;
+    for (let i = 0; i < sheets.length && !b64; i++) {
+      let rules: any;
+      try { rules = sheets[i].cssRules; } catch (_e) { continue; } // cross-origin sheet
+      if (!rules) continue;
+      for (let j = 0; j < rules.length; j++) {
+        const txt: string = (rules[j] && rules[j].cssText) || "";
+        if (txt.indexOf("base64,") !== -1 && txt.indexOf("Nunito") !== -1) {
+          const m = txt.match(/base64,([A-Za-z0-9+/=]+)/);
+          if (m) { b64 = m[1]; break; }
+        }
+      }
+    }
+    if (!b64) return;
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const face = new w.FontFace("Nunito", bytes.buffer, { weight: "400 800", style: "normal", display: "swap" });
+    face.load().then((f: any) => { try { document.fonts.add(f); } catch (_e) {} }).catch(() => {});
+  } catch (_e) {
+    /* CSS @font-face remains as the fallback */
+  }
+}
+
 // --- rendering --------------------------------------------------------------
 
 function buildRow(track: UiTrack): RowState {
@@ -769,19 +889,45 @@ function buildRow(track: UiTrack): RowState {
     showAttribution(track, el);
   });
 
-  // Click + drag to scrub (pointer capture so dragging works off the bar).
+  // Click + drag to scrub, plus a mouse hover preview. The preview is driven in JS off
+  // the CONTAINER (which has no internal gaps in its hit area) rather than per-bar CSS
+  // :hover — a CSS hover preview flickers in the 1px gaps between bars, where the cursor
+  // is over no bar at all. data-preview is separate from the real played fill, so it never
+  // clobbers playback state and clears cleanly on leave.
   let dragging = false;
+  let previewIdx = -1;
+  const previewTo = (frac: number) => {
+    let hi = Math.floor(frac * bars.length);
+    if (hi >= bars.length) hi = bars.length - 1;
+    if (hi === previewIdx) return;
+    if (hi > previewIdx) {
+      for (let i = previewIdx + 1; i <= hi; i++) bars[i].dataset.preview = "true";
+    } else {
+      for (let i = previewIdx; i > hi; i--) bars[i].dataset.preview = "";
+    }
+    previewIdx = hi;
+  };
+  const clearPreview = () => {
+    if (previewIdx < 0) return;
+    for (let i = 0; i <= previewIdx; i++) bars[i].dataset.preview = "";
+    previewIdx = -1;
+  };
+
   waveEl.addEventListener("pointerdown", (e: any) => {
     dragging = true;
+    clearPreview(); // the real drag fill takes over
     try { waveEl.setPointerCapture(e.pointerId); } catch (_e) {}
     seek(state, fractionFromX(waveEl, e.clientX));
     e.preventDefault();
   });
   waveEl.addEventListener("pointermove", (e: any) => {
-    if (dragging) seek(state, fractionFromX(waveEl, e.clientX));
+    if (dragging) { seek(state, fractionFromX(waveEl, e.clientX)); return; }
+    if (e.pointerType === "mouse") previewTo(fractionFromX(waveEl, e.clientX));
   });
+  waveEl.addEventListener("pointerleave", clearPreview);
   const stop = (e: any) => {
     dragging = false;
+    clearPreview();
     try { waveEl.releasePointerCapture(e.pointerId); } catch (_e) {}
   };
   waveEl.addEventListener("pointerup", stop);
@@ -1013,6 +1159,9 @@ function renderToolOutput(): void {
 }
 
 function init(): void {
+  // Register the brand font via the FontFace API so it loads even where the host CSP
+  // blocks the data: @font-face (e.g. Claude). Run first so the swap happens ASAP.
+  loadBrandFont();
   // Match the host colour scheme up front, then keep it in sync with host globals
   // changes and OS-level scheme flips.
   applyTheme();
