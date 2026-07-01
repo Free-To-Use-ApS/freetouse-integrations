@@ -380,7 +380,15 @@ export function hasUsableTerms(query: string): boolean {
 // For one track, how many distinct query words it matches (`matches`) and the
 // summed strength of those matches (`weight`). Each word is credited once, at its
 // best-matching field. `matches` drives precision (keep tracks that satisfy the
-// MOST words); `weight` orders within a tier (title/artist beat tag beats genre).
+// MOST words); `weight` orders within a tier.
+//
+// The CURATED descriptors (tags/categories, then genre) outrank the incidental text
+// (title, then artist). A mood word like "chill" is a substring of the label name
+// "Chill Pulse" and of titles like "Chillin'", so weighting title/artist highest used
+// to float off-genre tracks (e.g. a Christmas track by "Chill Pulse") above genuinely
+// chill-TAGGED tracks. Ranking the curated fields first fixes that; it doesn't hurt
+// artist/title search because those queries ("Pufino", "Magnificent") don't collide
+// with tags, and the match-count intersection already isolates them.
 function scoreEntry(entry: IndexEntry, groups: string[][]): { matches: number; weight: number } {
   let matches = 0;
   let weight = 0;
@@ -388,10 +396,10 @@ function scoreEntry(entry: IndexEntry, groups: string[][]): { matches: number; w
     let best = 0;
     for (const t of variants) {
       let f = 0;
-      if (entry.titleLc.includes(t)) f = 5;
-      else if (entry.artistLc.includes(t)) f = 5;
-      else if (entry.tagcat.includes(t)) f = 3;
-      else if (entry.genreLc.includes(t)) f = 2;
+      if (entry.tagcat.includes(t)) f = 5;
+      else if (entry.genreLc.includes(t)) f = 4;
+      else if (entry.titleLc.includes(t)) f = 3;
+      else if (entry.artistLc.includes(t)) f = 2;
       if (f > best) best = f;
     }
     if (best > 0) matches++;
@@ -498,8 +506,16 @@ export async function searchMusic(
     const base = applyFilters(useStaff ? entries : sortEntries(entries, sort), filters);
     return { ...paginate(base, limit, offset), sort: useStaff ? "staff" : sort };
   }
+  // An exact whole-query match on the title or artist means the user is after that
+  // specific track/artist (e.g. "Magnificent", "Pufino"), so lift it above tracks that
+  // merely carry the word as a tag — which the curated-field weighting otherwise favours.
+  const qLc = (query ?? "").trim().toLowerCase();
   const scored = applyFilters(entries, filters)
-    .map((e) => ({ e, ...scoreEntry(e, ts) }))
+    .map((e) => {
+      const s = scoreEntry(e, ts);
+      if (s.matches > 0 && qLc && (e.titleLc === qLc || e.artistLc === qLc)) s.weight += 100;
+      return { e, ...s };
+    })
     .filter((x) => x.matches > 0);
   // Keep ONLY the tracks that satisfy the most query words, so a multi-word query
   // intersects rather than unions: "lofi tracks by pufino" -> Pufino's lofi tracks,

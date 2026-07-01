@@ -352,8 +352,8 @@ function buildServer(): McpServer {
         "Then call it ONCE with a CONCISE query built from THEIR words — a few distinct " +
         'terms like "calm cinematic" or "sad piano", NEVER a long padded phrase (do NOT ' +
         'send "positive atmospheric background music for drone video cinematic travel"). ' +
-        'You can also search by artist ("Pufino") or track title ("Magnificent"); ' +
-        "title/artist matches rank first. You can also narrow with vocals " +
+        'You can also search by artist ("Pufino") or exact track title ("Magnificent"), ' +
+        "which surface that artist/track first. You can also narrow with vocals " +
         "(instrumental/vocal) and min_seconds/max_seconds when the user asks (e.g. " +
         '"instrumental lofi under 30 seconds"). The returned players ARE your answer — never ' +
         "reply that there are too many to show, and never invent a track count. For 'more like " +
