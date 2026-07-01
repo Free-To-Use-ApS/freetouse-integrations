@@ -15,18 +15,26 @@ import type { Track } from "@freetouse/api";
  * Coordinates playback across the Kit `AudioCard` rows and the bottom
  * "Now Playing" waveform bar.
  *
- * Each AudioCard owns its own HTMLAudioElement and the Kit's
- * AudioContextProvider guarantees only one plays at a time. This hook layers
- * on top of that: progress for the bottom bar, autoplay-next, and Media
- * Session (media keys). AudioCardRef has no seek API, so the bottom waveform
- * is a progress display (not click-to-seek).
+ * WHY WE OWN THE AUDIO ELEMENT
+ * ----------------------------
+ * The Kit `AudioCard` creates its `<audio>` with `new Audio()` in a private
+ * ref, exposes only play/pause/restart/isPlaying/isPaused via `AudioCardRef`
+ * (no seek), and the context that holds the element (`AudioContext`) is not
+ * part of the package's public `exports`. So there is no way to seek the
+ * AudioCard's playback — which is what a scrubbable waveform needs.
  *
- * IMPORTANT performance design (avoids recreating AudioCards' audio elements):
- * the per-tick `currentTime` lives in `NowPlayingStateContext`, consumed ONLY
- * by the bottom Player. Track rows consume the STABLE controls context plus a
- * low-frequency active-track-id context, so they don't re-render on every
- * timeupdate and the Kit AudioCard effect (which depends on `onEnded`) never
- * re-runs — every handler passed to AudioCard is stable.
+ * To bring back click/drag scrubbing (Canva review feedback), the bottom
+ * Now Playing bar drives playback from OUR OWN `<audio>` element, which we can
+ * seek freely. The AudioCards stay in the browse list as launchers: when a card
+ * starts its (Kit-owned) audio, we silence that card via its ref and play the
+ * same track through our element instead — so only one audio ever sounds.
+ *
+ * PERFORMANCE
+ * -----------
+ * Per-tick `currentTime` lives in `ProgressContext`, consumed only by the
+ * bottom Player's time/waveform. Track rows consume the STABLE controls context
+ * plus a low-frequency active-track-id context, so they don't re-render every
+ * timeupdate and the AudioCard effect never re-runs (all handlers are stable).
  */
 
 interface NowPlayingState {
@@ -39,11 +47,13 @@ interface NowPlayingState {
 interface NowPlayingControls {
   registerCard: (trackId: string, ref: AudioCardRef | null) => void;
   setQueue: (tracks: Track[]) => void;
-  onCardPlay: (track: Track, timestamp: number) => void;
-  onCardPause: (track: Track, timestamp: number) => void;
-  onCardTimeUpdate: (track: Track, timestamp: number) => void;
-  onCardEnded: (track: Track) => void;
+  /** Play a track (or toggle it if it's already the active track). Called from
+   * the AudioCard's play button and card body. */
+  playTrack: (track: Track) => void;
+  /** Pause/resume the active track (bottom bar transport). */
   toggleCurrent: () => void;
+  /** Seek the active track to a fraction (0–1) of its duration. */
+  seek: (fraction: number) => void;
 }
 
 interface NowPlayingTrackState {
@@ -57,11 +67,10 @@ interface NowPlayingProgressState {
 }
 
 const ControlsContext = createContext<NowPlayingControls | null>(null);
-const ActiveTrackIdContext = createContext<string | null>(null);
 // Split low-frequency (track / play state) from high-frequency (progress)
-// state so the Player shell — and its buttons — only re-render when the track
-// or play/pause state changes, not on every timeupdate tick (which would make
-// the Kit Buttons drop clicks mid-press).
+// state so consumers (track rows, the Player shell + its buttons) only
+// re-render when the track or play/pause state changes, not on every timeupdate
+// tick (which would make the Kit Buttons drop clicks mid-press).
 const TrackContext = createContext<NowPlayingTrackState | null>(null);
 const ProgressContext = createContext<NowPlayingProgressState | null>(null);
 
@@ -72,26 +81,75 @@ const INITIAL: NowPlayingState = {
   isPlaying: false,
 };
 
+/** Play, swallowing the AbortError that fires when a rapid src change / pause
+ * interrupts a pending play() promise (expected, not an error). */
+function safePlay(audio: HTMLAudioElement) {
+  const p = audio.play();
+  if (p && typeof p.catch === "function") p.catch(() => {});
+}
+
 export function NowPlayingProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<NowPlayingState>(INITIAL);
 
-  // Mirror state into a ref so stable callbacks can read the latest values
-  // without being re-created (which would churn AudioCard effects).
-  const stateRef = useRef(state);
-  stateRef.current = state;
-
+  // Stable callbacks read the live track/audio via refs (not state) so their
+  // identity never changes — the AudioCard effect that depends on them never
+  // re-runs and never recreates its <audio> element.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const cardRefs = useRef<Map<string, AudioCardRef>>(new Map());
   const queueRef = useRef<Track[]>([]);
-  const lastTimeRef = useRef<Map<string, number>>(new Map()); // per-track time
-  const playingIdRef = useRef<string | null>(null);
-  const pendingAdvanceRef = useRef<number | null>(null);
+  const currentTrackRef = useRef<Track | null>(null);
+  // Holds the latest autoplay-advance fn so the (once-created) audio element's
+  // `ended` handler always calls the current logic.
+  const onEndedRef = useRef<() => void>(() => {});
 
-  const cancelPendingAdvance = () => {
-    if (pendingAdvanceRef.current !== null) {
-      cancelAnimationFrame(pendingAdvanceRef.current);
-      pendingAdvanceRef.current = null;
-    }
-  };
+  // Lazily create our own audio element (the real, seekable player) and wire
+  // its events to state. Created once, on the first play.
+  const ensureAudio = useCallback(() => {
+    if (audioRef.current) return audioRef.current;
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.ontimeupdate = () => {
+      const a = audioRef.current;
+      if (a) setState((s) => (s.track ? { ...s, currentTime: a.currentTime } : s));
+    };
+    audio.onloadedmetadata = () => {
+      const a = audioRef.current;
+      if (a && Number.isFinite(a.duration) && a.duration > 0) {
+        setState((s) => (s.track ? { ...s, duration: a.duration } : s));
+      }
+    };
+    audio.onplay = () =>
+      setState((s) => (s.track ? { ...s, isPlaying: true } : s));
+    audio.onpause = () =>
+      setState((s) => (s.track ? { ...s, isPlaying: false } : s));
+    audio.onended = () => onEndedRef.current();
+    // A failed load (404 / CDN error / CORS) never fires play or ended, which
+    // would otherwise leave the transport stuck showing "playing" with no
+    // sound. Reset the state so the UI is truthful and the user can recover.
+    // (We don't auto-advance on error — a full outage would spin the queue.)
+    audio.onerror = () =>
+      setState((s) => (s.track ? { ...s, isPlaying: false } : s));
+    audioRef.current = audio;
+    return audio;
+  }, []);
+
+  // Load a track fresh and play it from the start.
+  const loadAndPlay = useCallback(
+    (track: Track) => {
+      const audio = ensureAudio();
+      currentTrackRef.current = track;
+      audio.src = track.files.mp3;
+      audio.currentTime = 0;
+      setState({
+        track,
+        currentTime: 0,
+        duration: track.duration,
+        isPlaying: true,
+      });
+      safePlay(audio);
+    },
+    [ensureAudio],
+  );
 
   const registerCard = useCallback(
     (trackId: string, ref: AudioCardRef | null) => {
@@ -105,76 +163,80 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     queueRef.current = tracks;
   }, []);
 
-  const onCardPlay = useCallback((track: Track, timestamp: number) => {
-    // A new track started — cancel any autoplay-advance scheduled by the
-    // previous (near-end) track so it can't override the user's choice.
-    cancelPendingAdvance();
-    playingIdRef.current = track.id;
-    lastTimeRef.current.set(track.id, timestamp);
-    setState((s) => ({
-      track,
-      currentTime: timestamp,
-      duration:
-        s.track?.id === track.id && s.duration ? s.duration : track.duration,
-      isPlaying: true,
-    }));
-  }, []);
-
-  const onCardPause = useCallback((track: Track, timestamp: number) => {
-    lastTimeRef.current.set(track.id, timestamp);
-    setState((s) =>
-      s.track?.id === track.id
-        ? { ...s, currentTime: timestamp, isPlaying: false }
-        : s,
-    );
-  }, []);
-
-  const onCardTimeUpdate = useCallback((track: Track, timestamp: number) => {
-    lastTimeRef.current.set(track.id, timestamp);
-    setState((s) =>
-      s.track?.id === track.id ? { ...s, currentTime: timestamp } : s,
-    );
-  }, []);
-
-  const onCardEnded = useCallback((track: Track) => {
-    // The Kit AudioContextProvider fires the PREVIOUS element's `ended` when a
-    // new track starts, so only advance if this is still the active track AND
-    // playback actually reached (near) the end of THIS track.
-    if (playingIdRef.current !== track.id) return;
-    const last = lastTimeRef.current.get(track.id) ?? 0;
-    const reachedEnd = last >= (track.duration || 0) - 1.5;
-
-    setState((s) => (s.track?.id === track.id ? { ...s, isPlaying: false } : s));
-    if (!reachedEnd) return;
-
-    // Clear so a re-fired `ended` for the same track is ignored.
-    playingIdRef.current = null;
-    const queue = queueRef.current;
-    if (queue.length === 0) return;
-    const idx = queue.findIndex((t) => t.id === track.id);
-    const next = idx === -1 ? queue[0] : queue[(idx + 1) % queue.length];
-    cancelPendingAdvance();
-    pendingAdvanceRef.current = requestAnimationFrame(() => {
-      pendingAdvanceRef.current = null;
-      // If the user started another track in the meantime, playingIdRef will
-      // no longer be null — don't override their choice.
-      if (playingIdRef.current !== null) return;
-      cardRefs.current.get(next.id)?.play();
-    });
-  }, []);
-
   const toggleCurrent = useCallback(() => {
-    const id = stateRef.current.track?.id;
-    if (!id) return;
-    const ref = cardRefs.current.get(id);
-    if (!ref) return;
-    // Use the AudioCard ref's own state (the Kit's source of truth):
-    //   isPaused()  -> active element but paused -> resume via play()
-    //   isPlaying() -> active element and playing -> pause()
-    //   neither     -> not the active element -> play()
-    if (ref.isPaused()) ref.play();
-    else if (ref.isPlaying()) ref.pause();
-    else ref.play();
+    const audio = audioRef.current;
+    if (!audio || !currentTrackRef.current) return;
+    if (audio.paused) safePlay(audio);
+    else audio.pause();
+  }, []);
+
+  // Called from an AudioCard's play button (its Kit-owned audio has just
+  // started) and from the card body. We silence the card's audio and drive
+  // playback from our own element. If it's already the active track, toggle it.
+  const playTrack = useCallback(
+    (track: Track) => {
+      cardRefs.current.get(track.id)?.pause(); // silence the Kit card's audio
+      const audio = audioRef.current;
+      if (audio && currentTrackRef.current?.id === track.id) {
+        if (audio.paused) safePlay(audio);
+        else audio.pause();
+        return;
+      }
+      loadAndPlay(track);
+    },
+    [loadAndPlay],
+  );
+
+  const seek = useCallback((fraction: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const dur =
+      Number.isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : currentTrackRef.current?.duration ?? 0;
+    if (dur <= 0) return;
+    const clamped = Math.min(1, Math.max(0, fraction));
+    // Never land exactly on the duration: seeking a playing element to its end
+    // fires `ended` in Chromium, which would auto-advance to the next track
+    // (so "seek to the end" would skip). Stay a hair short.
+    audio.currentTime = Math.min(clamped * dur, Math.max(0, dur - 0.25));
+    // Scrubbing the waveform resumes playback if it was paused (product pref).
+    if (audio.paused) safePlay(audio);
+    setState((s) => (s.track ? { ...s, currentTime: audio.currentTime } : s));
+  }, []);
+
+  // Move by an offset within the queue (media keys, autoplay-next).
+  const stepBy = useCallback(
+    (dir: 1 | -1) => {
+      const cur = currentTrackRef.current;
+      const queue = queueRef.current;
+      if (!cur || queue.length === 0) return;
+      const idx = queue.findIndex((t) => t.id === cur.id);
+      if (idx === -1) return;
+      loadAndPlay(queue[(idx + dir + queue.length) % queue.length]);
+    },
+    [loadAndPlay],
+  );
+
+  // Autoplay the next track when the current one ends naturally.
+  const advance = useCallback(() => {
+    const cur = currentTrackRef.current;
+    const queue = queueRef.current;
+    if (!cur || queue.length === 0) {
+      setState((s) => ({ ...s, isPlaying: false }));
+      return;
+    }
+    const idx = queue.findIndex((t) => t.id === cur.id);
+    const next = idx === -1 ? queue[0] : queue[(idx + 1) % queue.length];
+    loadAndPlay(next);
+  }, [loadAndPlay]);
+  onEndedRef.current = advance;
+
+  // Pause our audio when the provider unmounts (panel close).
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+    };
   }, []);
 
   // --- Media Session: surface the playing track to the OS / browser --------
@@ -204,7 +266,7 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
     navigator.mediaSession.playbackState = state.isPlaying ? "playing" : "paused";
   }, [state.track, state.isPlaying]);
 
-  // Register media-key handlers once; they read the latest refs.
+  // Register media-key handlers once; they act on our own audio element.
   useEffect(() => {
     if (typeof navigator === "undefined" || !("mediaSession" in navigator)) {
       return;
@@ -217,56 +279,34 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
         /* unsupported action — ignore */
       }
     };
-    const step = (dir: 1 | -1) => {
-      const id = stateRef.current.track?.id;
-      const queue = queueRef.current;
-      if (!id || queue.length === 0) return;
-      const idx = queue.findIndex((t) => t.id === id);
-      if (idx === -1) return;
-      const nextIdx = (idx + dir + queue.length) % queue.length;
-      cardRefs.current.get(queue[nextIdx].id)?.play();
-    };
     safe("play", () => {
-      const id = stateRef.current.track?.id;
-      if (id) cardRefs.current.get(id)?.play();
+      const audio = audioRef.current;
+      if (audio && currentTrackRef.current) safePlay(audio);
     });
     safe("pause", () => {
-      const id = stateRef.current.track?.id;
-      if (id) cardRefs.current.get(id)?.pause();
+      audioRef.current?.pause();
     });
-    safe("nexttrack", () => step(1));
-    safe("previoustrack", () => step(-1));
+    safe("nexttrack", () => stepBy(1));
+    safe("previoustrack", () => stepBy(-1));
     return () => {
       safe("play", null);
       safe("pause", null);
       safe("nexttrack", null);
       safe("previoustrack", null);
     };
-  }, []);
+  }, [stepBy]);
 
   // Stable controls — value never changes, so consumers (rows) don't re-render.
   const controls = useMemo<NowPlayingControls>(
     () => ({
       registerCard,
       setQueue,
-      onCardPlay,
-      onCardPause,
-      onCardTimeUpdate,
-      onCardEnded,
+      playTrack,
       toggleCurrent,
+      seek,
     }),
-    [
-      registerCard,
-      setQueue,
-      onCardPlay,
-      onCardPause,
-      onCardTimeUpdate,
-      onCardEnded,
-      toggleCurrent,
-    ],
+    [registerCard, setQueue, playTrack, toggleCurrent, seek],
   );
-
-  const activeTrackId = state.track?.id ?? null;
 
   // Low-frequency: changes only when the track or play/pause state changes.
   const trackValue = useMemo<NowPlayingTrackState>(
@@ -281,13 +321,11 @@ export function NowPlayingProvider({ children }: { children: ReactNode }) {
 
   return (
     <ControlsContext.Provider value={controls}>
-      <ActiveTrackIdContext.Provider value={activeTrackId}>
-        <TrackContext.Provider value={trackValue}>
-          <ProgressContext.Provider value={progressValue}>
-            {children}
-          </ProgressContext.Provider>
-        </TrackContext.Provider>
-      </ActiveTrackIdContext.Provider>
+      <TrackContext.Provider value={trackValue}>
+        <ProgressContext.Provider value={progressValue}>
+          {children}
+        </ProgressContext.Provider>
+      </TrackContext.Provider>
     </ControlsContext.Provider>
   );
 }
@@ -301,13 +339,8 @@ export function useNowPlayingControls(): NowPlayingControls {
   return ctx;
 }
 
-/** Low-frequency: the currently active track id (changes only on track switch). */
-export function useActiveTrackId(): string | null {
-  return useContext(ActiveTrackIdContext);
-}
-
 /** Low-frequency: the playing track + play/pause state (changes only on
- * track switch or play/pause). Safe for the Player shell + its buttons. */
+ * track switch or play/pause). Safe for track rows + the Player shell. */
 export function useNowPlayingTrack(): NowPlayingTrackState {
   const ctx = useContext(TrackContext);
   if (!ctx) {

@@ -44,11 +44,15 @@ body,
   flex-shrink: 0;
 }
 
+/* Left: no padding — Canva's app sandbox already insets the iframe ~16px on
+ * the left, so our own left padding compounded it (the review's "extra spacing
+ * on the left"). Right: the sandbox does NOT inset that side, so we add the
+ * 16px margin ourselves to keep content off the edge. */
 .app-controls {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 16px 12px 0;
 }
 
 /* Search field + "..." overflow menu on one row */
@@ -66,7 +70,7 @@ body,
 .app-content {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 12px 16px 12px 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -99,15 +103,58 @@ body,
   background-color: transparent !important;
 }
 
+/* Hide the AudioCard's built-in cover play button. Playback runs through our
+ * own seekable <audio> element (see useNowPlaying); if this Kit button were
+ * used it would start the card's own unseekable audio and leave the Kit stuck
+ * in a "playing-but-paused" state (AudioCardRef has no stop()), freezing the
+ * card's play icon and progress ring. Clicking the card body launches playback
+ * instead. `_9hcxfA` (audioControl) is an App UI Kit 5.11.0 utility class —
+ * version-dependent, re-verify on Kit upgrade. */
+.ftu-track-card ._9hcxfA {
+  display: none;
+}
+
+/* Inset so the ring isn't clipped by the iframe edge now that rows run
+ * full-bleed to the sandbox's 16px margin. */
 .ftu-track.is-playing {
-  box-shadow: 0 0 0 2px var(--ui-kit-color-action-primary-bg);
+  box-shadow: inset 0 0 0 2px var(--ui-kit-color-action-primary-bg);
 }
 
 /* The AudioCard flexes and shrinks; min-width: 0 lets its title/artist
  * truncate with an ellipsis instead of running under the action buttons. */
 .ftu-track-card {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Our play/pause affordance over the card cover (the Kit's own is hidden).
+ * Positioned over the 56×56 thumbnail at the start of the card, vertically
+ * centred. Same treatment as the bottom player: theme-aware content-fg glyph,
+ * no scrim. Revealed on row hover, and always shown for the active track.
+ * pointer-events:none so clicks fall through to the card (which toggles play). */
+.ftu-card-play {
+  position: absolute;
+  /* 8px = the Kit AudioCard's 1u content padding, which insets the 56×56
+   * thumbnail from the card's left edge. Re-check on Kit upgrade. */
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--ui-kit-color-content-fg);
+  opacity: 0;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+
+.ftu-track:hover .ftu-card-play,
+.ftu-track.is-playing .ftu-card-play {
+  opacity: 1;
 }
 
 /* Action buttons (find similar + add) sit beside the card and ALWAYS reserve
@@ -137,7 +184,9 @@ body,
   flex-shrink: 0;
   border-top: 1px solid var(--ui-kit-color-control-border);
   background: var(--ui-kit-color-control-bg);
-  padding: 8px 12px 10px;
+  /* Left 0 (sandbox insets the iframe), right 16px (ours) — matches the list
+   * so the player cover aligns with the track covers above. */
+  padding: 8px 16px 10px 0;
 }
 
 .ftu-np-bar {
@@ -237,7 +286,7 @@ body,
 }
 
 /* ---------------------------------------------------------------------------
- * Waveform scrubber (custom component, token-styled, display-only)
+ * Waveform scrubber (custom component, token-styled) — click/drag to seek
  * ------------------------------------------------------------------------- */
 .ftu-wave {
   display: flex;
@@ -246,6 +295,21 @@ body,
   column-gap: 1px;
   height: 28px;
   margin-top: 8px;
+}
+
+/* Seekable: show it's interactive and stop touch-drags from scrolling. */
+.ftu-wave-seekable {
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* Negative offset draws the ring INSIDE the box so it isn't clipped by the
+ * app's overflow:hidden now that the waveform runs full-bleed to the edge
+ * (same reason .ftu-track.is-playing uses an inset ring). */
+.ftu-wave-seekable:focus-visible {
+  outline: 2px solid var(--ui-kit-color-action-primary-bg);
+  outline-offset: -2px;
+  border-radius: 2px;
 }
 
 .ftu-wave-bar {
@@ -257,6 +321,8 @@ body,
    * the subtlest text token, matching Canva's mock). */
   background: var(--ui-kit-color-control-border);
   transition: background-color 200ms ease;
+  /* Pointer events go to the container so seek coords map to the full width. */
+  pointer-events: none;
 }
 
 .ftu-wave-bar[data-played="true"] {

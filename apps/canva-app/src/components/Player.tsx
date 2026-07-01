@@ -36,7 +36,7 @@ function LicenseBagIcon() {
       fill="currentColor"
       aria-hidden="true"
     >
-      <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-1v-.5a1.5 1.5 0 0 0-3 0V4h-1v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" />
+      <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1m3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" />
     </svg>
   );
 }
@@ -79,25 +79,27 @@ function NowPlayingTime({
 }
 
 /** Waveform fed by the high-frequency progress context, isolated for the same
- * reason as NowPlayingTime. */
+ * reason as NowPlayingTime. Click/drag on it seeks via `onSeek`. */
 function NowPlayingWaveform({
   data,
   totalFallback,
+  onSeek,
 }: {
   data: number[];
   totalFallback: number;
+  onSeek: (fraction: number) => void;
 }) {
   const { currentTime, duration } = useNowPlayingProgress();
   const total = duration > 0 ? duration : totalFallback;
   const progress = total > 0 ? currentTime / total : 0;
-  return <Waveform data={data} progress={progress} />;
+  return <Waveform data={data} progress={progress} onSeek={onSeek} />;
 }
 
 export function Player() {
   const intl = useIntl();
   const isSupported = useFeatureSupport();
   const canAdd = isSupported(addAudioTrack);
-  const { toggleCurrent } = useNowPlayingControls();
+  const { toggleCurrent, seek } = useNowPlayingControls();
   const { track, isPlaying } = useNowPlayingTrack();
   const { showAttribution } = useAttributionModal();
 
@@ -190,7 +192,11 @@ export function Player() {
         </div>
       </div>
 
-      <NowPlayingWaveform data={track.waveform} totalFallback={track.duration} />
+      <NowPlayingWaveform
+        data={track.waveform}
+        totalFallback={track.duration}
+        onSeek={seek}
+      />
 
       <div className="ftu-np-license">
         <FormattedMessage

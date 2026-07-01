@@ -262,6 +262,13 @@ export function App() {
       <div className="app-top">
         {relatedToId && (
           <SurfaceHeader
+            /* 'none' shows the app background through instead of the Kit's
+             * distinct "surface" band. The band spans the iframe width, but the
+             * Canva sandbox insets the iframe ~16px on the left, so the band
+             * couldn't reach the panel's left edge and read as a broken/partial
+             * bar (Canva review). Dropping it lets the header sit flush on the
+             * app background, aligned with the content, with its divider below. */
+            background="none"
             title={intl.formatMessage({
               defaultMessage: "Similar music",
               description:

@@ -3,6 +3,8 @@ import { useIntl } from "react-intl";
 import {
   AudioCard,
   Button,
+  PauseIcon,
+  PlayFilledIcon,
   PlusIcon,
   SearchIcon,
   Text,
@@ -13,8 +15,8 @@ import { upload } from "@canva/asset";
 import { addAudioTrack, ui } from "@canva/design";
 import { useFeatureSupport } from "@canva/app-hooks";
 import {
-  useActiveTrackId,
   useNowPlayingControls,
+  useNowPlayingTrack,
 } from "../hooks/useNowPlaying";
 import { useAttributionModal } from "../hooks/useAttributionModal";
 import { getArtistNames } from "../utils/format";
@@ -40,28 +42,20 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
   const intl = useIntl();
   const isSupported = useFeatureSupport();
   const canAdd = isSupported(addAudioTrack);
-  const {
-    registerCard,
-    onCardPlay,
-    onCardPause,
-    onCardTimeUpdate,
-    onCardEnded,
-  } = useNowPlayingControls();
-  const activeTrackId = useActiveTrackId();
+  const { registerCard, playTrack } = useNowPlayingControls();
+  const { track: nowPlaying, isPlaying } = useNowPlayingTrack();
   const { showAttribution } = useAttributionModal();
 
   const artist = getArtistNames(track);
   const displayTitle = `${artist} – ${track.title}`;
   const tags = getTagLabels(track);
-  const isActive = activeTrackId === track.id;
+  const isActive = nowPlaying?.id === track.id;
 
-  // Keep the latest track + this card's ref + playing flag in refs so the
-  // AudioCard callbacks can stay stable (a changing onEnded identity would
-  // make AudioCard recreate its <audio> element every render).
+  // Keep the latest track in a ref so the AudioCard callbacks can stay stable
+  // (a changing handler identity would make AudioCard recreate its <audio>
+  // element every render).
   const trackRef = useRef(track);
   trackRef.current = track;
-  const cardRef = useRef<AudioCardRef | null>(null);
-  const playingRef = useRef(false);
 
   const uploadAudio = useCallback(
     () =>
@@ -97,45 +91,25 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
     });
   };
 
-  // Register/unregister this card's imperative ref (stable).
+  // Register/unregister this card's imperative ref so the player can silence
+  // the card's Kit audio if it ever starts (see handlePlay).
   const setCardRef = useCallback(
-    (ref: AudioCardRef | null) => {
-      cardRef.current = ref;
-      registerCard(track.id, ref);
-    },
+    (ref: AudioCardRef | null) => registerCard(track.id, ref),
     [registerCard, track.id],
   );
 
-  // Clicking the card body toggles playback (per product preference). The
-  // built-in cover play button also works; add-to-design is the + button.
-  const handleCardClick = useCallback(() => {
-    if (playingRef.current) cardRef.current?.pause();
-    else cardRef.current?.play();
-  }, []);
-
-  // Stable AudioCard callbacks (read latest track via ref).
-  const handlePlay = useCallback(
-    (t: number) => {
-      playingRef.current = true;
-      onCardPlay(trackRef.current, t);
-    },
-    [onCardPlay],
-  );
-  const handlePause = useCallback(
-    (t: number) => {
-      playingRef.current = false;
-      onCardPause(trackRef.current, t);
-    },
-    [onCardPause],
-  );
-  const handleTimeUpdate = useCallback(
-    (t: number) => onCardTimeUpdate(trackRef.current, t),
-    [onCardTimeUpdate],
-  );
-  const handleEnded = useCallback(() => {
-    playingRef.current = false;
-    onCardEnded(trackRef.current);
-  }, [onCardEnded]);
+  // Clicking the card body launches playback in the shared, seekable player:
+  // `playTrack` toggles if this is already the active track, otherwise starts
+  // it. The Kit AudioCard's own cover play button is hidden via CSS (app.css) —
+  // using it would start the card's own unseekable audio and leave the Kit
+  // stuck "playing-but-paused" (no stop() on AudioCardRef), freezing the card's
+  // icon/progress ring. `onPlay` stays wired as a safety net: if a future Kit
+  // version changes the hashed class and the button reappears, onPlay routes
+  // that audio into playTrack (which silences the card and plays our seekable
+  // element) instead of leaking uncontrolled Kit audio. Add-to-design is the +.
+  const handlePlay = useCallback(() => {
+    playTrack(trackRef.current);
+  }, [playTrack]);
 
   const findSimilarLabel = intl.formatMessage({
     defaultMessage: "Find similar tracks",
@@ -172,7 +146,7 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
           { title: track.title },
         )}
         disabled={!canAdd}
-        onClick={handleCardClick}
+        onClick={handlePlay}
         onDragStart={canAdd ? handleDragStart : undefined}
         content={
           tags.length > 0 ? (
@@ -182,10 +156,14 @@ export function TrackItem({ track, onFindSimilar }: TrackItemProps) {
           ) : undefined
         }
         onPlay={handlePlay}
-        onPause={handlePause}
-        onTimeUpdate={handleTimeUpdate}
-        onEnded={handleEnded}
       />
+      {/* Our own play/pause affordance over the cover (the Kit's built-in one
+        * is hidden — see app.css). Shows on hover, and always for the active
+        * track (pause while playing, play while paused). Purely visual:
+        * pointer-events pass through to the card, which toggles playback. */}
+      <span className="ftu-card-play" aria-hidden="true">
+        {isActive && isPlaying ? <PauseIcon /> : <PlayFilledIcon />}
+      </span>
       </div>
       <div className="ftu-track-actions">
         <Button
